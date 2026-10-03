@@ -62,7 +62,7 @@ function rankCard(result) {
 
 function resultsPage() {
   const result = state.results.find((r) => r.attemptId === state.activeResult) || state.results[0];
-  if (!result) return `${pageHeading('YOUR RESULTS', '풀어본 만큼, 알게 된 만큼.', '시험지를 풀면 점수와 문항별 해설을 확인할 수 있어요.')}${empty('▥', '아직 풀이 결과가 없어요', '시험지를 만들고 첫 풀이를 완료해 보세요.', '<a class="button primary" href="#papers">시험지 보기 →</a>')}`;
+  if (!result) return `${pageHeading('YOUR RESULTS', '풀어본 만큼, 알게 된 만큼.', '시험지를 풀면 점수와 문항별 해설을 확인할 수 있어요.')}${empty('▥', '아직 샘플 풀이 결과가 없어요', '교안으로 만든 문제의 실제 기록은 문제 만들기 화면에서 확인하세요.', '<a class="button primary" href="#papers">시험지 보기 →</a>')}`;
   const paper = paperFor(result.examId);
   const percent = Math.round(result.score / result.maxScore * 100);
   return `${pageHeading('YOUR RESULTS · SAMPLE ONLY', '풀이를 마쳤어요.', `${esc(paper.title)} · 버전 ${result.examVersion} · ${dateText(result.submittedAt)}`, `<button class="button secondary" data-start="${paper.id}">다시 풀기 ↻</button>`)}
