@@ -13,6 +13,10 @@ header{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:white;bor
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 
 .new-course-card{align-items:center;justify-content:center;text-align:center;border:1.5px dashed #bbd1c8;background:#f0f6f2;min-height:300px}.new-course-card:hover{background:#e7f4ee;border-color:var(--blue)}.add-icon{font-size:42px;color:var(--blue)}.ranking-scroll{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:16px 12px;border-bottom:1px solid var(--line)}th{font-size:14px;color:var(--muted)}.generator .card{margin:18px 0}.generator button{background:var(--blue);color:white}.generator button.ghost{background:#e7f4ee;color:var(--blue)}.generator input[type=number]{width:90px;padding:10px;border:1px solid var(--line);border-radius:8px}.generator .row{flex-wrap:wrap}.generator .q{border:0;border-top:1px solid var(--line);padding:18px 0;min-width:0}.generator .q label{padding:12px;border:1px solid var(--line);border-radius:8px;margin:10px 0;cursor:pointer}.generator .q label.right{background:#e7f4ee;border-color:var(--blue)}.generator .q label.wrong{background:#fff0f0;border-color:#d3848d}.generator .evidence,.generator .msg{background:#f0f5f2;padding:14px;border-radius:8px}.generator .msg.error{background:#fff0f0}.generator .score{font-size:28px;font-weight:750}
+
+/* Compact course cards share one action style across every subject. */
+.course{min-height:146px;padding:20px;gap:20px;justify-content:space-between}.course-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.course-heading h2{font-size:20px;line-height:1.45;margin:3px 0 0;overflow-wrap:anywhere;min-width:0}.favorite{padding:0;width:34px;height:34px;flex-shrink:0;border:0;background:transparent;color:#91a299;font-size:26px;line-height:1;border-radius:7px}.favorite:hover{background:#e7f4ee}.favorite.is-favorite{color:#bd8d2c}.course-open{font-size:14px;padding:10px 16px;min-height:42px}.new-course-card{min-height:146px;padding:18px;gap:6px;justify-content:center}.new-course-card .add-icon{font-size:28px;line-height:1.1}.new-course-card h2{font-size:17px;margin:0}
+@media(max-width:700px){.course{min-height:140px;padding:18px}.course-heading h2{font-size:19px}.new-course-card{min-height:120px}}
 </style>
 </head>
 <body>
@@ -204,13 +208,10 @@ function render() {
       <div class="grid three">
         ${courses.map((c,i) => `
           <article class="card course" data-course-id="${escapeHTML(c.id)}">
-            <span class="badge ${c.demo ? 'green' : ''}">${c.demo ? '샘플 과목' : '새 과목'}</span>
-            <div class="course-icon">${c.demo ? '▣' : '▤'}</div>
-            <h2>${escapeHTML(c.name)}</h2>
-            <p class="muted">${c.demo ? '과목을 열어 학습을 이어가세요.' : '교안을 연결하고 학습을 시작하세요.'}</p>
-            <button class="${c.demo ? 'primary' : 'outline'}" onclick="openCourse(${i})">과목 열기 →</button>
+            <div class="course-heading"><h2>${escapeHTML(c.name)}</h2><button class="favorite ${c.favorite ? 'is-favorite' : ''}" onclick="toggleFavorite(${i})" aria-label="${escapeHTML(c.name)} 즐겨찾기" aria-pressed="${!!c.favorite}" title="즐겨찾기">${c.favorite ? '★' : '☆'}</button></div>
+            <button class="primary course-open" onclick="openCourse(${i})">과목 열기 →</button>
           </article>`).join('')}
-        <button class="card course new-course-card" onclick="newCourse()" aria-label="새 과목 만들기"><span class="add-icon">＋</span><h2>새 과목 만들기</h2><span class="muted">시험 준비할 과목을 추가하세요.</span></button>
+        <button class="card course new-course-card" onclick="newCourse()" aria-label="새 과목 만들기"><span class="add-icon">＋</span><h2>새 과목 만들기</h2></button>
       </div>
       <p class="muted small">추가한 과목은 이 브라우저에 저장됩니다.</p>
 
@@ -565,6 +566,14 @@ function pay() {
   paid = true;
   render();
   toast('테스트 결제 완료! 데모 이용권이 활성화됐어요.');
+}
+
+function toggleFavorite(i) {
+  if (!courses[i]) return;
+  courses[i].favorite = !courses[i].favorite;
+  persistCourses();
+  render();
+  document.querySelectorAll('.favorite')[i]?.focus();
 }
 
 function openCourse(i) {
