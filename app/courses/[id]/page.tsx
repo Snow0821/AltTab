@@ -34,6 +34,9 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         <h1 className="text-2xl font-bold">{info.course.title}</h1>
         {info.access.has && <span className="rounded-full bg-[var(--ok)] px-2 py-0.5 text-xs text-white">이용 중</span>}
       </div>
+      <p className="text-sm text-[var(--muted)]">
+        참여 코드 <span className="font-mono text-base font-bold tracking-widest text-[var(--ink)]">{info.course.joinCode}</span> · 같은 수업 친구가 이 코드로 들어올 수 있어요
+      </p>
 
       <StageMap key={mapVersion} courseId={id} courseTitle={info.course.title} />
 

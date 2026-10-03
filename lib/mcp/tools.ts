@@ -245,7 +245,7 @@ const submitConcepts: Tool = {
       }
     }
     return {
-      message: `개념 ${saved.length}개 저장, 이미 있음 ${existing.length}개, 거절 ${rejected.length}개`,
+      message: `개념 ${saved.length}개 저장, 이미 있는 개념 ${existing.length}개, 거절 ${rejected.length}개`,
       saved,
       existing,
       rejected,
