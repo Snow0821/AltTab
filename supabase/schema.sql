@@ -247,6 +247,15 @@ language sql stable as $$
   limit p_limit;
 $$;
 
+-- 출제 중요도: 개념 임베딩과 유사도가 기준 이상인 교안 조각의 비율(0.0~1.0). 실제 출제 확률이 아니다.
+create or replace function concept_importance(p_course uuid, p_embedding vector(1536), p_threshold float)
+returns float
+language sql stable as $$
+  select coalesce(avg(case when 1 - (c.embedding <=> p_embedding) >= p_threshold then 1.0 else 0.0 end), 0)::float
+  from chunks c
+  where c.course_id = p_course and c.embedding is not null;
+$$;
+
 -- ── 접근 차단 ─────────────────────────────────────────
 alter table courses enable row level security;
 alter table course_members enable row level security;
@@ -265,3 +274,4 @@ alter table entitlements enable row level security;
 alter table mcp_tokens enable row level security;
 revoke all on question_status from anon, authenticated;
 revoke execute on function match_chunks(uuid, vector, int) from public, anon, authenticated;
+revoke execute on function concept_importance(uuid, vector, float) from public, anon, authenticated;
