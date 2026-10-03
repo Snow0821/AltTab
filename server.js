@@ -75,6 +75,8 @@ app.use('/uploads', (req, res, next) => {
 }, express.static(uploadDir, { index: false }));
 // Isolated, sample-only exam UI. Existing upload home and data flow remain unchanged.
 app.use('/study', express.static(path.join(__dirname, 'public', 'exam-workspace')));
+// Integrated entry; preserve the existing PDF upload home.
+app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 function renderPage(fileList, message) {
   const items = fileList.map((f) => `
