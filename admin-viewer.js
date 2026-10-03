@@ -3,7 +3,7 @@
 const express = require('express');
 const path = require('node:path');
 
-const SUPABASE_ORIGIN = 'https://ltxuvtunctrayeewbwyd.supabase.co';
+const SUPABASE_ORIGIN = 'https://nwatlpkwenucgyexeopz.supabase.co';
 const TABLE_NAME = 'alttab_connection_test';
 const TABLE_URL = `${SUPABASE_ORIGIN}/rest/v1/${TABLE_NAME}`;
 const PAGE_SIZE = 25;
@@ -67,6 +67,7 @@ function publicRow(row) {
 }
 
 function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+  env = { ...env, SUPABASE_KEY: env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY, SUPABASE_URL: env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL };
   return {
     catalog: () => ({ ok: true, readOnly: true, public: true, tables: [TABLE] }),
     async rows(page = 1) {

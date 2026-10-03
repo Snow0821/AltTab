@@ -8,7 +8,7 @@
 
 ## 실제 확인한 저장 범위
 
-2026-10-03 Supabase 프로젝트 `ltxuvtunctrayeewbwyd`의 `public` 스키마를 조회했다. 현재 애플리케이션 테이블은 `alttab_connection_test` 하나이며 RLS 활성화, 단일 행 구조(`id = true`)다. `id`, `value`, `updated_at`만 선택해서 읽는다. 내부 LLM 사용 기록 컬럼은 조회하지 않는다.
+연결 대상은 소유자가 확인한 Supabase 프로젝트 `nwatlpkwenucgyexeopz`다. 조회 대상은 `alttab_connection_test` 한 개로 제한하며 다른 학습 테이블을 공개하지 않는다. RLS 활성화, 단일 행 구조(`id = true`)이며 `id`, `value`, `updated_at`만 선택해서 읽는다. 내부 LLM 사용 기록 컬럼은 조회하지 않는다.
 
 현재 확인된 값은 `안녕 AltTab! DB 연결 테스트`, 마지막 저장 시각은 `2026-10-03T06:02:55.959Z`였다. 이 내용은 스키마/저장 데이터 확인 시점의 증거이며 화면에 하드코딩된 성공 응답이 아니다. 화면의 연결 상태·행·조회 시각은 실제 서버 GET 성공 후에만 표시한다.
 

@@ -17,13 +17,14 @@
 
 Vercel 프로젝트의 기존 서버 환경 변수를 사용합니다.
 
-- `SUPABASE_KEY`: Supabase 서버 전용 키
+- `SUPABASE_SECRET_KEY` 또는 `SUPABASE_SERVICE_ROLE_KEY` 또는 `SUPABASE_KEY`: 본인 프로젝트의 서버 전용 키
 - `KOOKMIN_KEY`: 학교 AI 키
-- `SUPABASE_URL`: 선택 항목. 설정한다면 `https://ltxuvtunctrayeewbwyd.supabase.co`
+- `SUPABASE_URL`: `https://nwatlpkwenucgyexeopz.supabase.co`. 다른 프로젝트로 연결하지 않는다.
 
 ## 연결 정보
 
 - DB: `public.alttab_connection_test`
+- 스키마: [connection-check.sql](../supabase/connection-check.sql). 본인 프로젝트에 별도로 생성하며 다른 프로젝트의 데이터는 옮기거나 지우지 않는다. RLS를 켜고 공개 정책 없이 서버만 접근한다.
 - 필드: `id` (고정 true), `value` (테스트 문장), `updated_at` (저장 시각), `llm_claimed_at` (이전 1회 테스트 기록; 지금은 잠금에 사용하지 않음)
 - AI: `POST https://ai.cs.kookmin.ac.kr/v1/messages`
 - 모델: `claude-haiku-4-5`

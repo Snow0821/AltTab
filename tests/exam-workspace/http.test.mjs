@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 test('index is the home page, study assets serve correctly, and PDF upload flow is preserved', async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'alttab-ui-test-'));
   const port = process.env.UI_TEST_PORT || '3493';
-  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: port, VERCEL: '1', TMPDIR: temp, TEMP: temp, TMP: temp, SUPABASE_URL: '', NEXT_PUBLIC_SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: port, NODE_ENV: 'test', SUPABASE_SECRET_KEY: '', SUPABASE_KEY: '', VERCEL: '1', TMPDIR: temp, TEMP: temp, TMP: temp, SUPABASE_URL: '', NEXT_PUBLIC_SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (data) => { output += data; });
   child.stderr.on('data', (data) => { output += data; });

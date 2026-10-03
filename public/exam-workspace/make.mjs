@@ -1,5 +1,5 @@
 // FR-12 교안으로 객관식 5문제 만들기(설계: docs/exam-workspace-ui.md).
-// 글자는 브라우저에서 뽑고, 고른 쪽의 글자만 /api/generate로 보낸다. 결과와 풀이 기록은 이 브라우저(localStorage)에 남긴다.
+// PDF 글자는 브라우저에서 추출한다. 생성 문제와 전체 풀이 결과는 서버에, 샘플·오답 연습은 브라우저에 저장한다.
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
 const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 const courseScope = new URL(import.meta.url).searchParams.get('course');
@@ -23,6 +23,11 @@ let app;
 let initialized = false;
 const state = { material: null, from: 1, to: 1, status: 'idle', error: null, setKey: null, set: null, mode: 'all', answers: {}, result: null, resultSaved: false };
 const inflight = new Map();
+let participantToken;
+let participantJob;
+let remoteSets = [];
+let listError = '';
+let listLoaded = false;
 
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
@@ -30,9 +35,99 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const timeText = (iso) => { try { return new Date(iso).toLocaleString('ko-KR'); } catch { return iso; } };
 
 function saveLast(showResult = false) {
-  const saved = save(KEYS.last, { key: state.setKey, mode: state.mode, playIds: state.playIds, answers: state.answers, showResult });
+  const saved = save(KEYS.last, { key: state.setKey, mode: state.mode, playIds: state.playIds, answers: state.answers, showResult, attemptId: state.attemptId });
   if (!saved) state.error = '답안을 이 브라우저에 저장하지 못했어요. 새로고침하면 선택한 답이 사라질 수 있어요.';
   return saved;
+}
+
+async function api(path, body, authenticated = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authenticated) headers['X-Participant-Token'] = await participant();
+  const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.message || '저장 서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  return data;
+}
+
+async function participant() {
+  if (participantToken) return participantToken;
+  const stored = load('pf.participant', null);
+  if (typeof stored === 'string' && /^[A-Za-z0-9_-]{43}$/.test(stored)) return participantToken = stored;
+  if (!participantJob) participantJob = api('/api/participants', {}, false).then(data => {
+    if (!save('pf.participant', data.participantToken)) throw new Error('기록을 다시 찾으려면 브라우저 저장을 허용해 주세요.');
+    return participantToken = data.participantToken;
+  }).finally(() => { participantJob = null; });
+  return participantJob;
+}
+
+function cacheSet(key, set) {
+  const sets = load(KEYS.sets, {}); sets[key] = set;
+  return save(KEYS.sets, sets);
+}
+
+async function loadRemoteList() {
+  try {
+    const data = await api('/api/question-sets');
+    const byId = new Map(data.authored.map(s => [s.setId, s]));
+    data.attempted.forEach(s => byId.set(s.setId, { ...byId.get(s.setId), ...s }));
+    remoteSets = [...byId.values()].filter(s => (!courseScope || s.courseId === courseScope) && s.source !== 'test');
+    listError = ''; listLoaded = true;
+  } catch (e) { listError = e.message; }
+  if (state.status === 'idle' || state.status === 'ready') render();
+}
+
+async function prepareAttempt() {
+  const set = state.set;
+  if (!set.server) {
+    set.server = await api('/api/question-sets', { title: set.title + (set.range ? ` ${set.range.from}~${set.range.to}쪽` : ''), courseId: courseScope || undefined, source: set.source, questions: set.questions });
+    cacheSet(state.setKey, set);
+  }
+  if (!state.attemptId) {
+    const attempt = await api(`/api/question-sets/${encodeURIComponent(set.server.setId)}/attempts`, {});
+    state.attemptId = attempt.attemptId;
+    state.storage = attempt.storage;
+    saveLast();
+  }
+}
+
+async function saveRemote() {
+  if (state.pending) return;
+  state.pending = true; state.error = null; render();
+  try { await prepareAttempt(); }
+  catch (e) { state.error = `${e.message} 문제는 그대로 두었어요. 저장 다시 시도를 눌러 주세요.`; }
+  finally { state.pending = false; render(); }
+}
+
+function remoteResult(data) {
+  const details = data.details.map(d => ({ id: d.questionId, picked: d.answer, correct: d.correct }));
+  for (const q of state.set.questions) {
+    const d = data.details.find(item => item.questionId === q.id);
+    if (d) Object.assign(q, { answerIndex: d.answerIndex, explanation: d.explanation, evidence: d.evidence });
+  }
+  cacheSet(state.setKey, state.set);
+  return { key: state.setKey, kind: 'all', at: data.gradedAt, total: data.questionCount, correct: data.correctCount, details, wrongIds: details.filter(d => !d.correct).map(d => d.id), attemptId: data.attemptId, serverSaved: state.storage === 'supabase' };
+}
+
+async function openRemote(item) {
+  if (state.pending) return;
+  state.pending = true; state.error = null; render();
+  try {
+    const set = await api(`/api/shared-exams/${encodeURIComponent(item.shareCode)}`);
+    const key = `server:${item.setId}`;
+    const local = { ...set, source: item.source, server: item };
+    cacheSet(key, local);
+    state.pending = false;
+    if (!item.attemptId) return await openSet(key, local);
+    state.setKey = key; state.set = local; state.mode = 'all'; state.answers = {}; state.result = null;
+    state.attemptId = item.attemptId; state.storage = set.storage; state.status = 'solving'; state.pending = true;
+    const attempt = await api(`/api/attempts/${encodeURIComponent(item.attemptId)}`);
+    if (attempt.status === 'graded') {
+      state.result = remoteResult(attempt); state.resultSaved = state.result.serverSaved; state.status = 'result';
+      const attempts = load(KEYS.attempts, []); attempts.push(state.result); save(KEYS.attempts, attempts);
+    }
+    saveLast(state.status === 'result');
+  } catch (e) { state.error = e.message; }
+  finally { state.pending = false; render(); }
 }
 
 async function sha(text) {
@@ -104,7 +199,7 @@ async function generate() {
   inflight.set(key, job);
   try {
     const data = await job;
-    const set = { title: state.material.title, range: { from: state.from, to: state.to }, source: data.source, model: data.model, generatedAt: data.generatedAt, questions: data.questions };
+    const set = { title: state.material.title, range: { from: state.from, to: state.to }, source: data.source, model: data.model, generatedAt: data.generatedAt, rulesVersion: data.rulesVersion, questions: data.questions };
     const sets = load(KEYS.sets, {}); sets[key] = set; save(KEYS.sets, sets);
     openSet(key, set);
   } catch (e) {
@@ -115,10 +210,13 @@ async function generate() {
 }
 
 function openSet(key, set, mode = 'all') {
+  if (state.pending) return;
   state.playIds = mode === 'review' ? ((state.setKey === key && state.result ? state.result : lastAttempt(key))?.wrongIds || []) : null;
   state.setKey = key; state.set = set; state.mode = mode; state.answers = {}; state.result = null; state.status = 'solving'; state.error = null;
+  state.attemptId = null; state.storage = null; state.resultSaved = false;
   saveLast();
   render();
+  if (set.source !== 'sample' && mode === 'all') return saveRemote();
 }
 
 function questionsInPlay() {
@@ -131,9 +229,22 @@ function lastAttempt(key) {
   return load(KEYS.attempts, []).filter((a) => a.key === key).at(-1) || null;
 }
 
-function submit() {
+async function submit() {
+  if (state.pending) return;
   const qs = questionsInPlay();
   if (qs.some((q) => state.answers[q.id] === undefined)) return;
+  if (state.set.source !== 'sample' && state.mode === 'all') {
+    state.pending = true; state.error = null; render();
+    try {
+      await prepareAttempt();
+      const data = await api(`/api/attempts/${encodeURIComponent(state.attemptId)}/answers`, { answers: state.answers });
+      const result = remoteResult(data);
+      const attempts = load(KEYS.attempts, []); attempts.push(result); save(KEYS.attempts, attempts);
+      state.result = result; state.resultSaved = result.serverSaved; state.status = 'result'; saveLast(true);
+    } catch (e) { state.error = `${e.message} 답안은 그대로 두었어요. 제출을 다시 눌러 주세요.`; }
+    finally { state.pending = false; render(); }
+    return;
+  }
   const details = qs.map((q) => ({ id: q.id, picked: state.answers[q.id], correct: state.answers[q.id] === q.answerIndex }));
   const result = { key: state.setKey, kind: state.mode, at: new Date().toISOString(), total: qs.length, correct: details.filter((d) => d.correct).length, details, wrongIds: details.filter((d) => !d.correct).map((d) => d.id) };
   const attempts = load(KEYS.attempts, []); attempts.push(result);
@@ -148,16 +259,17 @@ function submit() {
 function sourceBadge(set) {
   return set.source === 'sample'
     ? '<span class="badge sample">샘플(AI 호출 없음)</span>'
-    : `<span class="badge">학교 AI 생성 · ${esc(set.model)} · ${esc(timeText(set.generatedAt))}</span>`;
+    : `<span class="badge">학교 AI 생성${set.model ? ` · ${esc(set.model)}` : ''}${set.generatedAt ? ` · ${esc(timeText(set.generatedAt))}` : ''}</span>`;
 }
 
 function savedList() {
   const sets = load(KEYS.sets, {});
   const keys = Object.keys(sets);
-  if (!keys.length) return '';
-  return `<section class="card saved"><h2>저장된 문제 묶음</h2><ul>${keys.map((k) => {
+  const remote = `<section class="card saved"><h2>서버에 저장한 문제</h2><p>이 브라우저에서 만든 문제와 풀이 기록이에요.</p><button class="ghost" id="refresh-saved" ${state.pending ? 'disabled' : ''}>목록 새로고침</button>${listError ? `<p role="alert">${esc(listError)}</p>` : ''}<ul>${remoteSets.map(s => `<li><button class="ghost" data-remote="${esc(s.setId)}" ${state.pending ? 'disabled' : ''}>${esc(s.title)}</button> ${s.status === 'graded' ? `· 최근 ${s.correctCount}/${s.questionCount}` : '· 풀기'}</li>`).join('')}</ul>${listLoaded && !remoteSets.length ? '<p>아직 서버에 저장한 문제가 없어요.</p>' : ''}</section>`;
+  if (!keys.length) return remote;
+  return remote + `<section class="card saved"><h2>이 브라우저에 보관한 문제</h2><ul>${keys.map((k) => {
     const s = sets[k]; const a = lastAttempt(k);
-    return `<li><button class="ghost" data-open="${esc(k)}">${esc(s.title)} ${s.range ? `${s.range.from}~${s.range.to}쪽` : ''}</button> ${sourceBadge(s)} ${a ? `· 최근 ${a.correct}/${a.total}` : '· 아직 안 풂'}</li>`;
+    return `<li><button class="ghost" data-open="${esc(k)}" ${state.pending ? 'disabled' : ''}>${esc(s.title)} ${s.range ? `${s.range.from}~${s.range.to}쪽` : ''}</button> ${sourceBadge(s)} ${a ? `· 최근 ${a.correct}/${a.total}` : '· 아직 안 풂'}</li>`;
   }).join('')}</ul></section>`;
 }
 
@@ -189,6 +301,8 @@ function render() {
   app.querySelector('#to')?.addEventListener('change', (e) => { s.to = Number(e.target.value); s.error = null; render(); });
   app.querySelector('#gen')?.addEventListener('click', generate);
   app.querySelector('#retry')?.addEventListener('click', generate);
+  app.querySelector('#refresh-saved')?.addEventListener('click', loadRemoteList);
+  app.querySelectorAll('[data-remote]').forEach(b => b.addEventListener('click', () => openRemote(remoteSets.find(s => s.setId === b.dataset.remote))));
   app.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openSet(b.dataset.open, load(KEYS.sets, {})[b.dataset.open])));
 }
 
@@ -199,26 +313,27 @@ function renderQuiz(err) {
   app.innerHTML = `
     <section class="card">
       <div class="row"><strong>${esc(s.set.title)} ${s.set.range ? `${s.set.range.from}~${s.set.range.to}쪽` : ''}</strong>${sourceBadge(s.set)}${s.mode === 'review' ? '<span class="badge">오답 복습</span>' : ''}</div>
-      ${done ? `<p class="score">${s.result.correct} / ${s.result.total} 정답</p><p>${timeText(s.result.at)} ${s.resultSaved ? '저장됨 · 새로고침해도 남아요' : '저장되지 않음 · 현재 화면에서 결과를 확인해 주세요'}</p>` : `<p>${answered} / ${qs.length}문항 답함</p>`}
+      ${done ? `<p class="score">${s.result.correct} / ${s.result.total} 정답</p><p>${timeText(s.result.at)} ${s.resultSaved ? (s.result.serverSaved ? '서버에 저장됨 · 목록에서 다시 확인할 수 있어요' : '이 브라우저에 저장됨 · 새로고침해도 남아요') : '저장되지 않음 · 현재 화면에서 결과를 확인해 주세요'}</p>` : `<p>${answered} / ${qs.length}문항 답함</p>${s.set.source !== 'sample' && s.mode === 'all' ? `<p>${s.pending ? '저장 중이에요…' : s.attemptId ? (s.storage === 'supabase' ? '문제가 서버에 저장됐어요. 제출하면 풀이 결과도 저장돼요.' : '개발용 임시 저장이에요.') : '문제가 서버에 저장되지 않았어요.'}</p>${!s.pending && !s.attemptId ? '<button id="retry-save">저장 다시 시도</button>' : ''}` : ''}`}
     </section>
     <section class="card">${qs.map((q, i) => {
       const d = detail(q);
       return `<fieldset class="q"><legend>Q${i + 1}. ${esc(q.body)}</legend>${q.choices.map((c, ci) => {
         const cls = done ? (ci === q.answerIndex ? 'right' : d && d.picked === ci ? 'wrong' : '') : '';
-        return `<label class="${cls}"><input type="radio" name="${q.id}" value="${ci}" ${s.answers[q.id] === ci || (d && d.picked === ci) ? 'checked' : ''} ${done ? 'disabled' : ''}> ${esc(c)}</label>`;
-      }).join('')}${done ? `<p>${d.correct ? '정답' : `오답 · 정답은 "${esc(q.choices[q.answerIndex])}"`}</p><p>${esc(q.explanation)}</p><p class="evidence">근거 ${q.evidence.page}쪽: “${esc(q.evidence.quote)}”</p>` : ''}</fieldset>`;
+        return `<label class="${cls}"><input type="radio" name="${q.id}" value="${ci}" ${s.answers[q.id] === ci || (d && d.picked === ci) ? 'checked' : ''} ${done || s.pending ? 'disabled' : ''}> ${esc(c)}</label>`;
+      }).join('')}${done ? `<p>${d.correct ? '정답' : `오답 · 정답은 "${esc(q.choices[q.answerIndex])}"`}</p><p>${esc(q.explanation)}</p>${q.evidence ? `<p class="evidence">근거 ${q.evidence.page}쪽: “${esc(q.evidence.quote)}”</p>` : ''}` : ''}</fieldset>`;
     }).join('')}</section>
     ${err}
     <p class="row">${done
       ? `${s.result.wrongIds.length ? '<button id="review">오답 복습</button>' : '<span class="msg">모두 맞혔어요!</span>'}<button class="ghost" id="again">처음부터 다시 풀기</button><button class="ghost" id="home">다른 자료·범위</button>`
-      : `<button id="submit" ${answered < qs.length ? 'disabled' : ''}>제출하고 채점하기</button><button class="ghost" id="home">다른 자료·범위</button>`}</p>`;
+      : `<button id="submit" ${answered < qs.length || s.pending ? 'disabled' : ''}>${s.pending ? '저장 중…' : '제출하고 채점하기'}</button><button class="ghost" id="home" ${s.pending ? 'disabled' : ''}>다른 자료·범위</button>`}</p>`;
   app.querySelectorAll('input[type=radio]').forEach((r) => r.addEventListener('change', () => {
     s.answers[r.name] = Number(r.value); s.error = null; saveLast(); render();
   }));
   app.querySelector('#submit')?.addEventListener('click', submit);
+  app.querySelector('#retry-save')?.addEventListener('click', saveRemote);
   app.querySelector('#review')?.addEventListener('click', () => openSet(s.setKey, s.set, 'review'));
   app.querySelector('#again')?.addEventListener('click', () => openSet(s.setKey, s.set, 'all'));
-  app.querySelector('#home')?.addEventListener('click', () => { s.status = s.material ? 'ready' : 'idle'; s.set = null; s.result = null; save(KEYS.last, null); render(); });
+  app.querySelector('#home')?.addEventListener('click', () => { if (s.pending) return; s.status = s.material ? 'ready' : 'idle'; s.set = null; s.result = null; save(KEYS.last, null); render(); void loadRemoteList(); });
 }
 
 // 새로고침 뒤 마지막으로 보던 문제·결과를 되살린다.
@@ -227,6 +342,7 @@ function restore() {
   const set = last && (last.key === 'sample' ? SAMPLE : load(KEYS.sets, {})[last.key]);
   if (set) {
     state.setKey = last.key; state.set = set; state.mode = last.mode || 'all'; state.playIds = last.playIds || null;
+    state.attemptId = last.attemptId || null;
     const a = last.showResult && lastAttempt(last.key);
     if (a && a.kind === state.mode) { state.result = a; state.resultSaved = true; state.status = 'result'; }
     else {
@@ -238,11 +354,24 @@ function restore() {
     }
   }
   render();
+  if (set && set.source !== 'sample' && state.mode === 'all') {
+    if (state.attemptId && set.server) {
+      state.pending = true; render();
+      api(`/api/shared-exams/${encodeURIComponent(set.server.shareCode)}`).then(meta => {
+        state.storage = meta.storage;
+        return api(`/api/attempts/${encodeURIComponent(state.attemptId)}`);
+      }).then(data => {
+        if (data.status === 'graded') {
+          state.result = remoteResult(data); state.resultSaved = state.result.serverSaved; state.status = 'result';
+        }
+      }).catch(e => { state.error = e.message; }).finally(() => { state.pending = false; render(); });
+    } else void saveRemote();
+  }
 }
 
 export function mount(target) {
   app = target;
-  if (!initialized) { initialized = true; restore(); } else render();
+  if (!initialized) { initialized = true; restore(); if (load('pf.participant', null)) void loadRemoteList(); } else render();
 }
 
 if (!courseScope) mount(document.getElementById('app'));

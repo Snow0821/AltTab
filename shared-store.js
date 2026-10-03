@@ -10,7 +10,7 @@
  * - Supabase 모드에서 DB 오류는 502(db_error)로 올린다. 로컬로 몰래 폴백해 성공으로 꾸미지 않는다.
  *
  * 환경변수
- * - 주소: SUPABASE_URL 또는 NEXT_PUBLIC_SUPABASE_URL. 둘 다 없으면 연결 시연(connection-check.js)과 같은 팀 DB.
+ * - 주소: SUPABASE_URL 또는 NEXT_PUBLIC_SUPABASE_URL. 둘 다 없으면 소유자 확인 프로젝트. 다른 주소는 거부한다.
  * - 키:   SUPABASE_SERVICE_ROLE_KEY 또는 SUPABASE_SECRET_KEY 또는 SUPABASE_KEY(현재 Vercel 설정 이름). 서버 전용.
  */
 
@@ -18,9 +18,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const TEAM_SUPABASE_URL = 'https://ltxuvtunctrayeewbwyd.supabase.co';
-const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || TEAM_SUPABASE_URL).replace(/\/$/, '');
+const OWN_SUPABASE_URL = 'https://nwatlpkwenucgyexeopz.supabase.co';
+const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || OWN_SUPABASE_URL).replace(/\/$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_KEY || '';
+for (const url of [process.env.SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL]) {
+  if (url && url.replace(/\/$/, '') !== OWN_SUPABASE_URL) throw new Error('db_target_mismatch: 본인 Supabase 프로젝트 URL을 확인해 주세요.');
+}
+if (!SUPABASE_KEY && (process.env.NODE_ENV === 'production' || (process.env.VERCEL && process.env.NODE_ENV !== 'test'))) {
+  throw new Error('db_not_configured: 운영 서버에 Supabase 서버 키가 필요합니다. 임시 저장으로 전환하지 않습니다.');
+}
 const EXAMS_TABLE = 'shared_exams';
 const ATTEMPTS_TABLE = 'shared_attempts';
 

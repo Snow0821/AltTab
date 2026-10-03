@@ -20,7 +20,7 @@ function startServer(temp) {
     : { SUPABASE_URL: '', NEXT_PUBLIC_SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '', SUPABASE_SECRET_KEY: '', SUPABASE_KEY: '' };
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, PORT: port, VERCEL: '1', TMPDIR: temp, TEMP: temp, TMP: temp, ...blank },
+    env: { ...process.env, PORT: port, NODE_ENV: 'test', VERCEL: '1', TMPDIR: temp, TEMP: temp, TMP: temp, ...blank },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let output = '';

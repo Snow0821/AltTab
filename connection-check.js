@@ -3,7 +3,7 @@
 const express = require('express');
 const path = require('node:path');
 
-const SUPABASE_ORIGIN = 'https://ltxuvtunctrayeewbwyd.supabase.co';
+const SUPABASE_ORIGIN = 'https://nwatlpkwenucgyexeopz.supabase.co';
 const TABLE_URL = `${SUPABASE_ORIGIN}/rest/v1/alttab_connection_test`;
 const LLM_URL = 'https://ai.cs.kookmin.ac.kr/v1/messages';
 const MODEL = 'claude-haiku-4-5';
@@ -83,6 +83,7 @@ async function readBoundedJson(response) {
 }
 
 function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+  env = { ...env, SUPABASE_KEY: env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY, SUPABASE_URL: env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL };
   const dbHeaders = () => {
     if (!env.SUPABASE_KEY) fail(503, 'db_not_configured', '서버에 SUPABASE_KEY가 설정되지 않았어요.');
     if (env.SUPABASE_URL && env.SUPABASE_URL.replace(/\/$/, '') !== SUPABASE_ORIGIN) {
