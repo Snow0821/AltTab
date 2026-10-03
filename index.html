@@ -27,6 +27,9 @@ header{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:white;bor
 /* Calm editorial cards: a small label, title, useful description, one clear action. */
 .course-grid article.course{padding:20px;gap:9px;justify-content:flex-start;border:1px solid #e1e9e4;background:#fff}.course-tag{align-self:flex-start;padding:3px 8px;border-radius:6px;background:#edf5f0;color:#52816c;font-size:10px;font-weight:650;letter-spacing:.3px;line-height:1.5}.course-grid article.course h2{font-size:19px;line-height:1.35;letter-spacing:-.55px;margin:3px 0 0;font-weight:750;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.course-description{font-size:12px;line-height:1.65;color:#82938a;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.course-grid .course-open{min-height:36px;padding:8px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;justify-content:space-between}.course-open span{font-size:16px;font-weight:400}textarea{width:100%;resize:vertical;min-height:90px;max-height:230px;border:1px solid var(--line);border-radius:10px;background:#fafcfb;color:var(--ink);font:inherit;font-size:14px;padding:12px 14px;margin-top:9px;line-height:1.6}textarea:focus-visible{outline:3px solid #50a895;outline-offset:3px}.modal label .small{font-size:12px;font-weight:400}
 @media(max-width:700px){.course-grid article.course{padding:15px;min-height:190px;gap:7px}.course-grid article.course h2{font-size:16px}.course-description{font-size:11px}.course-tag{font-size:9px}.course-grid .course-open{min-height:32px;font-size:11px}}
+
+.stage-empty{text-align:center;padding:34px 12px}.stage-empty>span{font-size:40px;color:var(--blue)}.stage-empty h2{margin-top:20px}.learning-path{display:grid;gap:18px;margin-top:24px;position:relative}.learning-stage{display:flex;align-items:center;gap:20px;text-align:left;border:1px solid #dce8df;background:#fafcfb;padding:22px;border-radius:14px;width:100%}.learning-stage:hover{background:#e7f4ee;border-color:#9fcdbb}.learning-node{display:grid;place-items:center;width:60px;height:60px;flex-shrink:0;border-radius:50%;background:var(--blue);color:white;font-size:23px;font-weight:750;box-shadow:0 5px 0 #086451}.learning-stage.complete .learning-node{background:#dcefe4;color:#0d806c;box-shadow:0 5px 0 #bddacb}.learning-copy{display:grid;gap:4px;flex:1;min-width:0}.learning-copy small{font-size:10px;letter-spacing:1.5px;color:#73a28a}.learning-copy strong{font-size:18px;overflow-wrap:anywhere}.learning-copy>span{font-size:12px;color:var(--muted)}.learning-action{font-size:13px;color:var(--blue);white-space:nowrap}.step-options{display:grid;gap:12px}.generator .step-option{display:flex;gap:12px;align-items:center;text-align:left;background:white;color:var(--ink);border:1px solid var(--line);padding:18px;border-radius:12px}.step-option>span{display:grid;place-items:center;flex-shrink:0;border:1px solid var(--line);border-radius:7px;width:28px;height:28px;font-size:12px}.generator .step-option.selected{border:2px solid var(--blue);background:#edf7f1;color:var(--blue)}.generator .step-option.right{border-color:#0d806c;background:#e7f4ee}.generator .step-option.wrong{border-color:#d3848d;background:#fff0f0}.generator .step-option:disabled{opacity:1}.step-feedback{margin-top:22px;background:#e7f4ee;padding:20px;border-radius:12px}.step-feedback.incorrect{background:#fff5e9}.step-feedback p{font-size:14px}.step-quiz{max-width:740px;margin:0 auto!important}
+@media(max-width:700px){.learning-stage{padding:16px;gap:12px;flex-wrap:wrap}.learning-node{width:48px;height:48px}.learning-action{margin-left:60px}.learning-copy strong{font-size:16px}}
 </style>
 </head>
 <body>
@@ -72,6 +75,7 @@ let activeCourseId = courses[0]?.id || '';
 const courseFiles = new Map();
 let rankingState = {status:'idle',rows:[]};
 let rankingController;
+let activeStageKey = null;
 function persistCourses() { try { localStorage.setItem(COURSE_KEY, JSON.stringify(courses)); return true; } catch { toast('브라우저 저장이 제한되어 새로고침하면 과목이 사라질 수 있어요.'); return false; } }
 
 let selected = -1;
@@ -261,11 +265,11 @@ function render() {
   }
 
   else if (page === 'course') {
-    const item = courses.find(c => c.id === activeCourseId);
-    html = `<div class="content">${title()}<p class="subtitle" style="margin-top:16px">이 과목의 교안을 연결하고 나만의 문제로 공부하세요.</p>
-      <section class="card"><div class="course-icon">▤</div><h2 style="margin-top:20px">교안 연결</h2><p class="muted">PDF를 선택하고 시험 범위를 정하면 AI가 문제를 준비해요.</p><button class="primary" data-page="materials">교안 연결하기 →</button></section>
-      ${item?.demo ? '<section class="card" style="margin-top:20px"><h2>학습 이어가기</h2><p class="muted">샘플 학습맵에서 문제를 풀어볼 수 있어요.</p><button class="outline" data-page="map">학습 시작 →</button></section>' : ''}
-      <section class="card" style="margin-top:20px"><h2>사용자 랭킹</h2><p class="muted">등록된 사용자 점수와 순위를 확인하세요.</p><button class="outline" data-page="ranking">랭킹 보기 →</button></section></div>`;
+    html = `<div class="content">${title()}<div class="row between" style="margin:20px 0"><p class="muted">만들어진 시험지를 한 문제씩 풀며 학습하세요.</p><button class="outline small" data-page="materials">＋ 교안 연결 · 문제 만들기</button></div><section id="course-stages" class="card" aria-live="polite"><p>학습 단계를 불러오는 중…</p></section></div>`;
+  }
+
+  else if (page === 'stage') {
+    html = `<div class="content">${title()}<button class="small" data-page="course" style="margin:18px 0">← 학습 단계</button><div id="course-generator" class="generator" aria-live="polite"><p>문제를 불러오는 중…</p></div></div>`;
   }
 
   else if (page === 'materials') {
@@ -531,18 +535,19 @@ function render() {
   }
 
   document.body.classList.toggle('login-view', page === 'login');
-  const labels = {login:'로그인',home:'내 과목',map:'학습맵',materials:'교안 · AI 연결',review:'복습',payment:'이용권',course:'과목 홈',ranking:'랭킹',quiz:'문제 풀이',result:'학습 결과'};
+  const labels = {login:'로그인',home:'내 과목',map:'학습맵',materials:'교안 · AI 연결',review:'복습',payment:'이용권',course:'과목 홈',ranking:'랭킹',stage:'단계별 학습',quiz:'문제 풀이',result:'학습 결과'};
   $('#page-crumb').textContent = labels[page] || '내 과목';
   document.title = 'PassFinder · ' + (labels[page] || '내 과목');
   document.querySelectorAll('header [data-page]').forEach(b => {
-    if (b.dataset.page === page || (b.dataset.page === 'home' && ['course','materials','map','quiz','result'].includes(page))) b.setAttribute('aria-current', 'page');
+    if (b.dataset.page === page || (b.dataset.page === 'home' && ['course','materials','stage','map','quiz','result'].includes(page))) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   });
   $('#app').innerHTML = html;
   stageObserver.disconnect();
   document.querySelectorAll('.stage').forEach(el => stageObserver.observe(el));
 
-  if (page === 'materials') mountGenerator();
+  if (page === 'materials' || page === 'stage') mountGenerator();
+  if (page === 'course') mountCourseStages();
 
 }
 
@@ -636,11 +641,28 @@ async function mountGenerator() {
   const id = activeCourseId;
   try {
     const module = await import('/study/make.mjs?course=' + encodeURIComponent(id));
-    if (page === 'materials' && activeCourseId === id && target?.isConnected) module.mount(target);
+    if (['materials','stage'].includes(page) && activeCourseId === id && target?.isConnected) module.mount(target, page === 'stage' ? {stageKey:activeStageKey} : {});
   } catch {
     if (target?.isConnected) target.innerHTML = '<p>교안 연결 화면을 불러오지 못했어요.</p><button onclick="mountGenerator()">다시 시도</button>';
   }
 }
+
+
+async function mountCourseStages() {
+  const target = $('#course-stages'); const id = activeCourseId;
+  try {
+    const module = await import('/study/make.mjs?course=' + encodeURIComponent(id));
+    if (page !== 'course' || id !== activeCourseId || !target?.isConnected) return;
+    const stages = module.getStages();
+    if (!stages.length) {
+      target.innerHTML = '<div class="stage-empty"><span>▤</span><h2>첫 학습 단계를 만들어 보세요.</h2><p class="muted">교안을 연결해 문제를 만들면 이곳에서 바로 학습할 수 있어요.</p><button class="primary" data-page="materials">교안 연결하기 →</button></div>'; return;
+    }
+    target.innerHTML = `<div class="row between"><h2>나의 학습 여정</h2><span class="badge">${stages.filter(s=>s.completed).length} / ${stages.length} 단계 완료</span></div><div class="learning-path">${stages.map(stage=>`<button class="learning-stage ${stage.completed ? 'complete' : ''}" data-stage-key="${escapeHTML(stage.key)}"><span class="learning-node">${stage.completed ? '✓' : stage.number}</span><span class="learning-copy"><small>STAGE ${stage.number}</small><strong>${escapeHTML(String(stage.title))}</strong><span>${stage.range ? `${stage.range.from}~${stage.range.to}쪽 · ` : ''}${stage.count}문제${stage.completed ? ` · ${stage.correct}/${stage.total} 정답` : ''}</span></span><span class="learning-action">${stage.completed ? '다시 학습' : '학습 시작'} →</span></button>`).join('')}</div>`;
+    target.querySelectorAll('[data-stage-key]').forEach(button=>button.addEventListener('click',()=>{activeStageKey=button.dataset.stageKey;go('stage');}));
+  } catch {if (target?.isConnected) target.innerHTML='<p>학습 단계를 불러오지 못했어요.</p><button onclick="mountCourseStages()">다시 시도</button>';}
+}
+
+document.addEventListener('pf:stage-home',e=>{if(e.detail?.courseId===activeCourseId) go('course');});
 
 async function loadRanking() {
   rankingController?.abort();
