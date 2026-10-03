@@ -33,7 +33,8 @@ function buildQuizCriteriaLines(style) {
     '- 선택지는 4개. 오답 3개는 그럴듯해야 한다(무관한 보기나 말장난 금지). 자료에 등장하는 비슷한 용어/흔히 헷갈리는 개념을 오답으로 활용한다.',
     '- 질문 문장은 중의적이지 않고 명확하게 쓴다.',
     '- 해설(explanation)에는 정답인 이유와, 헷갈릴 수 있는 오답이 왜 틀렸는지를 1~2문장으로 포함한다.',
-    '- 단순 암기보다 이해를 확인하는 문제를 우선한다.'
+    '- 단순 암기보다 이해를 확인하는 문제를 우선한다.',
+    '- 각 문제에는 topic(그 문제가 다루는 세부 주제를 2~6단어로 요약한 한국어 라벨, 예: "이분 탐색", "시간 복잡도")을 함께 작성한다.'
   ];
 }
 
@@ -48,9 +49,10 @@ const QUESTION_SCHEMA = {
           question: { type: 'string' },
           options: { type: 'array', items: { type: 'string' } },
           answer_index: { type: 'integer' },
-          explanation: { type: 'string' }
+          explanation: { type: 'string' },
+          topic: { type: 'string' }
         },
-        required: ['question', 'options', 'answer_index', 'explanation'],
+        required: ['question', 'options', 'answer_index', 'explanation', 'topic'],
         additionalProperties: false
       }
     }
@@ -58,6 +60,27 @@ const QUESTION_SCHEMA = {
   required: ['questions'],
   additionalProperties: false
 };
+
+function normalizeQuestionText(s) {
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Duplicates are checked only against already-approved questions in the same
+// course+week scope — pending/rejected items aren't a confirmed-good baseline yet.
+function isDuplicateOfApproved(allList, course, week, questionText) {
+  const normalized = normalizeQuestionText(questionText);
+  return allList.some((f) =>
+    f.course === course && String(f.week) === String(week) &&
+    (f.questions || []).some((q) => q.status === 'approved' && normalizeQuestionText(q.question) === normalized)
+  );
+}
+
+function tagQuestionStatuses(entry, questions, allList) {
+  return questions.map((q) => ({
+    ...q,
+    status: isDuplicateOfApproved(allList, entry.course, entry.week, q.question) ? 'duplicate' : 'pending'
+  }));
+}
 
 const uploadDir = path.join(__dirname, 'uploads');
 const metadataFile = path.join(uploadDir, 'metadata.json');
@@ -71,6 +94,34 @@ function readMetadata() {
 
 function writeMetadata(data) {
   fs.writeFileSync(metadataFile, JSON.stringify(data, null, 2));
+}
+
+// --- Daily usage limit: the server calls Anthropic with its own key, so a
+// cap is needed to bound cost. Resets at UTC midnight. ---
+
+const usageFile = path.join(uploadDir, 'usage.json');
+const DAILY_GENERATION_LIMIT = process.env.DAILY_GENERATION_LIMIT !== undefined && Number.isFinite(Number(process.env.DAILY_GENERATION_LIMIT))
+  ? Number(process.env.DAILY_GENERATION_LIMIT)
+  : 30;
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readUsage() {
+  if (!fs.existsSync(usageFile)) return { date: todayKey(), count: 0 };
+  const data = JSON.parse(fs.readFileSync(usageFile, 'utf-8'));
+  return data.date === todayKey() ? data : { date: todayKey(), count: 0 };
+}
+
+function consumeUsage() {
+  const usage = readUsage();
+  usage.count += 1;
+  fs.writeFileSync(usageFile, JSON.stringify(usage, null, 2));
+}
+
+function remainingUsage() {
+  return Math.max(0, DAILY_GENERATION_LIMIT - readUsage().count);
 }
 
 function escapeHtml(str) {
@@ -188,10 +239,19 @@ function pageShell(title, bodyHtml) {
   .share-group { margin-top: 12px; }
   .share-group h4 { margin: 0 0 4px; font-size: 0.9rem; color: #333; }
   .generate-form { flex-direction: row; flex-wrap: wrap; padding: 0; background: none; box-shadow: none; gap: 6px; align-items: center; }
-  .generate-form input[type=password], .generate-form select, .generate-form input[type=number] { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.82rem; }
-  .generate-form input[type=password] { width: 150px; }
+  .generate-form select, .generate-form input[type=number] { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.82rem; }
   .generate-form input[type=number] { width: 55px; }
   .generate-form button { padding: 6px 10px; font-size: 0.85rem; }
+  .topic-tag { font-size: 0.7rem; color: #6d28d9; background: #f3e8ff; padding: 2px 6px; border-radius: 6px; margin-left: 6px; font-weight: 500; }
+  .status-tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; margin-left: 6px; font-weight: 500; }
+  .status-tag.pending { color: #92400e; background: #fef3c7; }
+  .status-tag.duplicate { color: #991b1b; background: #fee2e2; }
+  .review-actions { margin-top: 10px; display: flex; gap: 6px; }
+  .review-actions form { padding: 0; background: none; box-shadow: none; display: inline; }
+  button.tiny { padding: 4px 10px; font-size: 0.78rem; background: #e5e7eb; color: #333; }
+  button.tiny:hover { background: #d1d5db; }
+  button.tiny.secondary { background: #fee2e2; color: #991b1b; }
+  button.tiny.secondary:hover { background: #fecaca; }
 </style>
 </head>
 <body>
@@ -241,9 +301,7 @@ function renderFileItem(f) {
   const actions = f.questions
     ? `<a href="/questions/${encodeURIComponent(f.storedName)}"><button type="button" class="secondary">생성된 문제 보기</button></a>`
     : `
-      <form class="generate-form" action="/generate/${encodeURIComponent(f.storedName)}" method="post"
-            onsubmit="localStorage.setItem('passfinder_api_key', this.apiKey.value)">
-        <input type="password" name="apiKey" class="apikey-input" placeholder="Anthropic API 키" autocomplete="off" required>
+      <form class="generate-form" action="/generate/${encodeURIComponent(f.storedName)}" method="post">
         <select name="style">
           <option value="mixed">혼합</option>
           <option value="concept">개념확인</option>
@@ -321,44 +379,60 @@ function renderPage(fileList, message, req) {
     <input type="file" name="pdf" accept="application/pdf" required>
     <button type="submit">업로드</button>
   </form>
+  <p class="meta">오늘 남은 문제 생성 횟수: ${remainingUsage()} / ${DAILY_GENERATION_LIMIT}</p>
   ${message ? `<div class="message ${message.type === 'error' ? 'error' : ''}">${escapeHtml(message.text)}</div>` : ''}
   <h2>업로드된 교안</h2>
   ${renderFileTree(fileList)}
   ${mcpInstructionsHtml(req)}
-  <script>
-    (function() {
-      var saved = localStorage.getItem('passfinder_api_key') || '';
-      document.querySelectorAll('.apikey-input').forEach(function(el) { el.value = saved; });
-    })();
-  </script>
   `;
 
   return pageShell('PassFinder - 교안 업로드', body);
 }
 
-function renderQuestionCards(questions) {
+function renderQuestionCards(questions, options = {}) {
+  const { showReview = false, storedName = '', backTo = '' } = options;
   return questions.map((q, i) => {
-    const options = q.options.map((opt) => `<li>${escapeHtml(opt)}</li>`).join('');
+    if (q.status === 'rejected') return '';
+
+    const optionItems = q.options.map((opt) => `<li>${escapeHtml(opt)}</li>`).join('');
     const answerText = q.options[q.answer_index] !== undefined ? q.options[q.answer_index] : '?';
+    const topicTag = q.topic ? `<span class="topic-tag">${escapeHtml(q.topic)}</span>` : '';
+    const statusTag = q.status === 'pending' ? '<span class="status-tag pending">검수 중</span>'
+      : q.status === 'duplicate' ? '<span class="status-tag duplicate">중복 의심</span>' : '';
+    const reviewActions = (showReview && (q.status === 'pending' || q.status === 'duplicate')) ? `
+      <div class="review-actions">
+        <form method="post" action="/review/${encodeURIComponent(storedName)}/${i}">
+          <input type="hidden" name="action" value="approve">
+          <input type="hidden" name="back" value="${escapeHtml(backTo)}">
+          <button type="submit" class="tiny">괜찮아요</button>
+        </form>
+        <form method="post" action="/review/${encodeURIComponent(storedName)}/${i}">
+          <input type="hidden" name="action" value="reject">
+          <input type="hidden" name="back" value="${escapeHtml(backTo)}">
+          <button type="submit" class="tiny secondary">이상해요</button>
+        </form>
+      </div>` : '';
+
     return `
     <div class="question-card">
-      <p class="q">${i + 1}. ${escapeHtml(q.question)}</p>
-      <ol type="1">${options}</ol>
+      <p class="q">${i + 1}. ${escapeHtml(q.question)}${topicTag}${statusTag}</p>
+      <ol type="1">${optionItems}</ol>
       <details>
         <summary>정답 및 해설 보기</summary>
         <p><strong>정답:</strong> ${escapeHtml(answerText)}</p>
         <p>${escapeHtml(q.explanation)}</p>
       </details>
+      ${reviewActions}
     </div>
   `;
   }).join('');
 }
 
-function renderSharedGroup(entries) {
+function renderSharedGroup(entries, backTo) {
   return entries.map((f) => `
     <div class="share-group">
       <h4>${escapeHtml(f.originalName)} · ${escapeHtml(f.professor)} 교수 · ${escapeHtml(f.week)}주차</h4>
-      ${renderQuestionCards(f.questions)}
+      ${renderQuestionCards(f.questions, { showReview: true, storedName: f.storedName, backTo })}
     </div>
   `).join('');
 }
@@ -380,13 +454,13 @@ function renderQuestionsPage(entry, allList) {
   <div class="share-section">
     <h2>같은 주차 · 같은 교수님 문제 더 풀어보기</h2>
     <p class="sub">다른 사람이 이 교수님의 "${escapeHtml(entry.course)}" ${escapeHtml(entry.week)}주차 자료로 만든 문제입니다.</p>
-    ${sameProfessor.length ? renderSharedGroup(sameProfessor) : '<p class="empty">아직 없습니다.</p>'}
+    ${sameProfessor.length ? renderSharedGroup(sameProfessor, entry.storedName) : '<p class="empty">아직 없습니다.</p>'}
   </div>
 
   <div class="share-section">
     <h2>같은 주차 · 다른 교수님 문제 더 풀어보기</h2>
     <p class="sub">다른 교수님의 "${escapeHtml(entry.course)}" ${escapeHtml(entry.week)}주차 자료로 만든 문제입니다.</p>
-    ${otherProfessor.length ? renderSharedGroup(otherProfessor) : '<p class="empty">아직 없습니다.</p>'}
+    ${otherProfessor.length ? renderSharedGroup(otherProfessor, entry.storedName) : '<p class="empty">아직 없습니다.</p>'}
   </div>
 
   <a class="back-link" href="/">&larr; 목록으로 돌아가기</a>
@@ -446,8 +520,26 @@ app.get('/questions/:storedName', (req, res) => {
   res.send(renderQuestionsPage(entry, list));
 });
 
-// --- Server-proxied generation: user supplies their own Anthropic API key per request.
-// The key is never written to disk or logged; it is used only for this one call. ---
+app.post('/review/:storedName/:index', express.urlencoded({ extended: false }), (req, res) => {
+  const list = readMetadata();
+  const entry = list.find((f) => f.storedName === req.params.storedName);
+  const idx = Number(req.params.index);
+  const question = entry && entry.questions && entry.questions[idx];
+  if (!question) {
+    return res.status(404).send(renderPage(list, { type: 'error', text: '문제를 찾을 수 없습니다.' }, req));
+  }
+
+  if (req.body.action === 'approve') question.status = 'approved';
+  else if (req.body.action === 'reject') question.status = 'rejected';
+  else return res.status(400).send(renderPage(list, { type: 'error', text: '잘못된 요청입니다.' }, req));
+
+  writeMetadata(list);
+  const backTo = req.body.back || entry.storedName;
+  res.redirect(`/questions/${encodeURIComponent(backTo)}`);
+});
+
+// --- Server-proxied generation: the server calls Anthropic with its own key
+// (ANTHROPIC_API_KEY), bounded by a daily usage cap since the cost is ours. ---
 
 app.post('/generate/:storedName', express.urlencoded({ extended: false }), async (req, res) => {
   const list = readMetadata();
@@ -456,9 +548,15 @@ app.post('/generate/:storedName', express.urlencoded({ extended: false }), async
     return res.status(404).send(renderPage(list, { type: 'error', text: '자료를 찾을 수 없습니다.' }, req));
   }
 
-  const apiKey = (req.body.apiKey || '').trim();
-  if (!apiKey) {
-    return res.status(400).send(renderPage(list, { type: 'error', text: 'Anthropic API 키를 입력해주세요.' }, req));
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).send(renderPage(list, { type: 'error', text: '서버에 ANTHROPIC_API_KEY 환경변수가 설정되어 있지 않습니다.' }, req));
+  }
+
+  if (remainingUsage() <= 0) {
+    return res.status(429).send(renderPage(list, {
+      type: 'error',
+      text: `오늘의 문제 생성 한도(${DAILY_GENERATION_LIMIT}회)를 모두 사용했습니다. 내일 다시 시도해주세요.`
+    }, req));
   }
 
   const count = Math.min(Math.max(Number(req.body.count) || 5, 1), 20);
@@ -484,7 +582,7 @@ app.post('/generate/:storedName', express.urlencoded({ extended: false }), async
   ].join('\n');
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = new Anthropic();
     const message = await anthropic.messages.create({
       model: 'claude-opus-5',
       max_tokens: 8000,
@@ -504,8 +602,9 @@ app.post('/generate/:storedName', express.urlencoded({ extended: false }), async
     }
 
     const parsed = JSON.parse(textBlock.text);
-    entry.questions = parsed.questions;
+    entry.questions = tagQuestionStatuses(entry, parsed.questions, list);
     writeMetadata(list);
+    consumeUsage();
     res.redirect(`/questions/${encodeURIComponent(entry.storedName)}`);
   } catch (err) {
     console.error('문제 생성 오류:', err.message);
@@ -557,14 +656,15 @@ function buildMcpServer() {
   });
 
   server.registerTool('submit_questions', {
-    description: '생성한 객관식 문제를 자료 ID에 저장합니다. 저장 후 사용자는 웹 페이지에서 바로 확인할 수 있습니다.',
+    description: '생성한 객관식 문제를 자료 ID에 저장합니다. 저장 후 사용자는 웹 페이지에서 바로 확인할 수 있습니다. 저장된 문제는 다른 학생의 검수(승인/신고)를 거쳐야 공유 목록에 노출됩니다.',
     inputSchema: {
       id: z.string().describe('문제를 생성한 자료의 ID'),
       questions: z.array(z.object({
         question: z.string().describe('문제 질문'),
         options: z.array(z.string()).length(4).describe('선택지 4개'),
         answer_index: z.number().int().min(0).max(3).describe('정답 선택지의 0부터 시작하는 인덱스'),
-        explanation: z.string().describe('정답에 대한 간단한 해설')
+        explanation: z.string().describe('정답에 대한 간단한 해설'),
+        topic: z.string().describe('이 문제가 다루는 세부 주제 (2~6단어, 예: "이분 탐색")')
       })).min(1).describe('생성된 객관식 문제 목록')
     }
   }, async ({ id, questions }) => {
@@ -573,7 +673,7 @@ function buildMcpServer() {
     if (!entry) {
       return { content: [{ type: 'text', text: `자료 ID "${id}"를 찾을 수 없습니다.` }], isError: true };
     }
-    entry.questions = questions;
+    entry.questions = tagQuestionStatuses(entry, questions, list);
     writeMetadata(list);
     return { content: [{ type: 'text', text: `${questions.length}개의 문제가 저장되었습니다. 자료 ID: ${id}` }] };
   });
