@@ -32,3 +32,14 @@ test('partial question state restores without losing the answer or confirmation'
   const resumed=setup({'pf.make.last.course-a':saved});
   resumed.window.restore();assert(resumed.window.document.querySelector('.step-feedback'));assert.equal(resumed.window.document.querySelector('[data-choice="0"]').getAttribute('aria-pressed'),'true');resumed.window.close();
 });
+
+test('material setup opens file picker while preserving saved stages and progress',()=>{
+  const dom=setup(),w=dom.window,d=w.document;
+  d.querySelector('[data-choice="0"]').click();d.querySelector('#step-action').click();
+  const saved=w.localStorage.getItem('pf.make.last.course-a');
+  w.mount(d.querySelector('#app'),{setup:true});
+  assert(d.querySelector('#file'));assert.equal(d.querySelector('#step-action'),null);
+  assert.equal(w.getStages().length,1);assert.equal(w.localStorage.getItem('pf.make.last.course-a'),saved);
+  w.mount(d.querySelector('#app'),{stageKey:'set1'});assert(d.querySelector('.step-feedback'));
+  dom.window.close();
+});

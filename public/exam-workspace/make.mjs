@@ -279,6 +279,11 @@ function renderStep(err = '') {
 
 export function mount(target, options = {}) {
   app = target;
+  if (options.setup) {
+    initialized = true;
+    Object.assign(state, { material: null, from: 1, to: 1, status: 'idle', error: null, setKey: null, set: null, mode: 'all', answers: {}, result: null, cursor: 0, checked: false });
+    return render();
+  }
   if (options.stageKey) {
     initialized = true;
     const last = load(KEYS.last, null);
