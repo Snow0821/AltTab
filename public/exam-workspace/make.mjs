@@ -295,7 +295,7 @@ function render() {
       ${s.error && s.status === 'ready' ? '<button class="ghost" id="retry">다시 시도</button>' : ''}</p>
       ${err}
     </section>` : err}
-    ${savedList()}`;
+    ${s.setupOnly ? '' : savedList()}`;
   app.querySelector('#file')?.addEventListener('change', (e) => onFile(e.target.files[0]));
   app.querySelector('#sample')?.addEventListener('click', () => openSet('sample', SAMPLE));
   app.querySelector('#from')?.addEventListener('change', (e) => { s.from = Number(e.target.value); s.error = null; render(); });
@@ -428,9 +428,16 @@ function renderStep(err = '') {
 
 export function mount(target, options = {}) {
   app = target;
+  if (options.setup) {
+    if (state.pending) return;
+    state.setupOnly = true; state.stageMode = false;
+    initialized = true;
+    Object.assign(state, { material: null, from: 1, to: 1, status: 'idle', error: null, setKey: null, set: null, mode: 'all', answers: {}, result: null, cursor: 0, checked: false });
+    return render();
+  }
   if (options.stageKey) {
     if (state.pending) return;
-    state.stageMode = true; initialized = true;
+    state.setupOnly = false; state.stageMode = true; initialized = true;
     const last = load(KEYS.last, null);
     if (last?.key === options.stageKey && last.mode === 'all' && !last.showResult) return restore();
     const set = load(KEYS.sets, {})[options.stageKey];

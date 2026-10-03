@@ -50,13 +50,13 @@
       for (const record of data.rows) {
         const row = document.createElement('tr');
         const id = document.createElement('td'); id.textContent = String(record.id);
-        const value = document.createElement('td'); value.textContent = record.valueRedacted ? '가려진 텍스트 · 공개 검토가 필요해요' : record.value;
+        const value = document.createElement('td'); value.textContent = typeof record.value === 'string' ? record.value : '[비밀값 숨김]';
         if (record.valueRedacted) value.className = 'redacted';
         const updated = document.createElement('td'); updated.textContent = formatTime(record.updated_at);
         row.append(id, value, updated); $('rows').append(row);
       }
       if (!data.rows.length) empty(page > 1 ? '이 페이지에 저장된 행이 없어요.' : '아직 저장된 데이터가 없어요. 연결 테스트에서 먼저 저장해 주세요.');
-      $('status').textContent = data.rows.some(row => row.valueRedacted) ? 'DB 조회 완료 · 자유 입력 텍스트는 공개 화면에서 가렸어요.' : 'DB에서 최신 저장 값을 읽었어요. 새로고침하면 다시 조회해요.';
+      $('status').textContent = data.rows.some(row => row.valueRedacted) ? 'DB 조회 완료 · 저장된 문장에서 감지된 키·비밀번호만 가렸어요.' : 'DB에서 최신 저장 값을 읽었어요. 새로고침하면 다시 조회해요.';
       $('status').dataset.state = 'success';
     } catch (error) {
       $('connection-state').textContent = '조회 실패';

@@ -641,7 +641,7 @@ async function mountGenerator() {
   const id = activeCourseId;
   try {
     const module = await import('/study/make.mjs?course=' + encodeURIComponent(id));
-    if (['materials','stage'].includes(page) && activeCourseId === id && target?.isConnected) module.mount(target, page === 'stage' ? {stageKey:activeStageKey} : {});
+    if (['materials','stage'].includes(page) && activeCourseId === id && target?.isConnected) module.mount(target, page === 'stage' ? {stageKey:activeStageKey} : {setup:true});
   } catch {
     if (target?.isConnected) target.innerHTML = '<p>교안 연결 화면을 불러오지 못했어요.</p><button onclick="mountGenerator()">다시 시도</button>';
   }

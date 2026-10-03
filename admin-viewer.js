@@ -10,9 +10,9 @@ const PAGE_SIZE = 25;
 const MAX_PAGE = 100;
 const MAX_RESPONSE_BYTES = 16384;
 // This is an intentionally public, read-only viewer, not a Supabase admin proxy.
-// New tables/columns/text values must be reviewed before adding to this allowlist.
-// Unknown free text is fully hidden: regex-based PII detection is not sufficient.
-const PUBLIC_TEST_VALUES = new Set(['안녕 AltTab! DB 연결 테스트']);
+// The user approved public visibility of ordinary text in this test table.
+// This does not make arbitrary tables/columns public or allow credential exposure.
+const SECRET_MASK = '[비밀값 숨김]';
 const TABLE = Object.freeze({
   name: TABLE_NAME,
   schema: 'public',
@@ -20,7 +20,7 @@ const TABLE = Object.freeze({
   description: '연결 테스트 화면에서 저장한 단일 테스트 행',
   columns: [
     { name: 'id', type: 'boolean', description: '항상 true인 고정 테스트 행 ID' },
-    { name: 'value', type: 'text', description: '공개 검토된 샘플만 표시. 그 외 자유 입력은 가림' },
+    { name: 'value', type: 'text', description: '저장한 테스트 문장. 감지된 키·비밀번호만 가림' },
     { name: 'updated_at', type: 'timestamptz', description: 'DB에 마지막으로 저장한 시각' },
   ],
 });
@@ -52,17 +52,30 @@ async function readBoundedJson(response) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { fail(502, 'invalid_response', 'DB 응답 형식을 확인하지 못했어요.'); }
 }
-function publicRow(row) {
+function redactSecrets(value, secrets = []) {
+  let text = value;
+  for (const secret of secrets) {
+    if (typeof secret === 'string' && secret.length >= 8) text = text.split(secret).join(SECRET_MASK);
+  }
+  text = text
+    .replace(/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*/g, SECRET_MASK)
+    .replace(/\b(?:sb_secret_|sb_publishable_|sk[-_]|gh[pousr]_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]{8,}/g, SECRET_MASK)
+    .replace(/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b/g, SECRET_MASK)
+    .replace(/(\b(?:postgres(?:ql)?|https?):\/\/)[^:\s/@]+:[^\s/@]+@/gi, `$1${SECRET_MASK}@`)
+    .replace(/(\bBearer\s+)[A-Za-z0-9._~+\/-]{8,}={0,2}/gi, `$1${SECRET_MASK}`)
+    .replace(/(\bBasic\s+)([A-Za-z0-9+/]{2,}={0,2})/gi, (match, prefix, token) => Buffer.from(token, 'base64').includes(58) ? `${prefix}${SECRET_MASK}` : match)
+    .replace(/((?:\b(?:(?:[a-z][a-z0-9]*_)*(?:password|passwd|pwd|secret|secret_access_key|api_key|access_token|refresh_token|auth_token|private_key|access_key_id)|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|SUPABASE_KEY|SUPABASE_SERVICE_ROLE_KEY|KOOKMIN_KEY)\b|비밀번호|비밀키|인증토큰)["']?\s*[:=]\s*)(?:\[비밀값 숨김\]|"(?:\\[\s\S]|[^"\\])*(?:"|\\?$)|'(?:\\[\s\S]|[^'\\])*(?:'|\\?$)|[^\s,;}"']+)/gi, `$1${SECRET_MASK}`);
+  return { value: text, valueRedacted: text !== value };
+}
+function publicRow(row, secrets) {
   if (!row || row.id !== true || typeof row.value !== 'string' || [...row.value].length > 200 ||
       typeof row.updated_at !== 'string' || row.updated_at.length > 40 || !Number.isFinite(Date.parse(row.updated_at))) {
     fail(502, 'invalid_response', '테스트 테이블의 데이터 형식을 확인해 주세요.');
   }
-  const valueRedacted = !PUBLIC_TEST_VALUES.has(row.value);
   return {
     id: true,
-    value: valueRedacted ? null : row.value,
+    ...redactSecrets(row.value, secrets),
     updated_at: new Date(row.updated_at).toISOString(),
-    valueRedacted,
   };
 }
 
@@ -96,7 +109,8 @@ function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Da
         const match = /\/(\d+)$/.exec(response.headers.get('content-range') || '');
         const totalRows = match ? Number(match[1]) : null;
         if (totalRows !== null && (!Number.isSafeInteger(totalRows) || totalRows > 1)) fail(502, 'invalid_response', '테스트 테이블의 행 수가 예상과 달라요.');
-        return { ok: true, source: 'supabase', readOnly: true, table: TABLE, rows: rows.map(publicRow),
+        const secrets = [env.SUPABASE_KEY, env.SUPABASE_SERVICE_ROLE_KEY, env.KOOKMIN_KEY, env.ANTHROPIC_API_KEY, env.OPENAI_API_KEY];
+        return { ok: true, source: 'supabase', readOnly: true, table: TABLE, rows: rows.map(row => publicRow(row, secrets)),
           pagination: { page, pageSize: PAGE_SIZE, totalRows, hasNextPage: false }, fetchedAt: new Date(now()).toISOString() };
       } catch (error) {
         if (error instanceof ViewerError) throw error;
@@ -140,4 +154,5 @@ function registerAdminViewer(app, options = {}) {
 module.exports = registerAdminViewer;
 module.exports.makeService = makeService;
 module.exports.readPage = readPage;
+module.exports.redactSecrets = redactSecrets;
 module.exports.constants = { TABLE_NAME, TABLE_URL, PAGE_SIZE, MAX_PAGE };
