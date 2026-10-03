@@ -453,19 +453,15 @@ const submitQuestions: Tool = {
         if (!sims.length) { rejected.push({ index: v.index, reason: "근거 쪽이 아직 분석되지 않았어요. 교안 분석이 끝난 뒤 다시 보내 주세요" }); continue; }
         const score = Math.max(...sims);
         if (score < EVIDENCE_MIN) { rejected.push({ index: v.index, reason: `근거 불일치(근거 쪽과의 유사도 ${score.toFixed(2)})` }); continue; }
-        const { data, error } = await db().from("questions").insert({ ...v.row, evidence_score: Math.round(score * 1000) / 1000 }).select("id").single();
+        // 문항과 1차 검수 기록을 한 트랜잭션(submit_question)으로 저장한다
+        const { data: qid, error } = await db().rpc("submit_question", {
+          p: { ...v.row, evidence_score: Math.round(score * 1000) / 1000 },
+          p_checklist: v.checklist,
+          p_reason: v.note,
+        });
         if (error?.code === "23505") { rejected.push({ index: v.index, reason: "중복: 같은 본문의 문항이 이미 있어요" }); continue; }
         if (error) throw error;
-        const { error: e3 } = await db().from("review_log").insert({
-          question_id: data.id,
-          reviewer_id: userId,
-          stage: 1,
-          verdict: "pass",
-          checklist: v.checklist,
-          reason: v.note,
-        });
-        if (e3) throw e3;
-        passed.push({ index: v.index, question_id: data.id });
+        passed.push({ index: v.index, question_id: qid as string });
       }
     }
     rejected.sort((a, b) => a.index - b.index);

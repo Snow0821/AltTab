@@ -136,6 +136,31 @@ create table if not exists review_log (
   unique (question_id, reviewer_id, stage)
 );
 
+-- 문항과 1차 검수 기록을 한 트랜잭션으로 저장한다. 둘 중 하나가 실패하면 둘 다 남지 않는다.
+create or replace function submit_question(p jsonb, p_checklist jsonb, p_reason text)
+returns uuid
+language plpgsql as $$
+declare
+  qid uuid;
+begin
+  insert into questions (course_id, concept_id, author_id, difficulty, qtype, body, body_norm, choices, answer,
+                         accepted_answers, explanation, evidence_refs, check_note, evidence_score)
+  values (
+    (p->>'course_id')::uuid, (p->>'concept_id')::uuid, (p->>'author_id')::uuid, (p->>'difficulty')::smallint,
+    p->>'qtype', p->>'body', p->>'body_norm',
+    case when jsonb_typeof(p->'choices') = 'array' then array(select jsonb_array_elements_text(p->'choices')) else null end,
+    p->>'answer',
+    array(select jsonb_array_elements_text(coalesce(p->'accepted_answers', '[]'::jsonb))),
+    p->>'explanation',
+    array(select jsonb_array_elements_text(p->'evidence_refs')),
+    p->>'check_note', (p->>'evidence_score')::real)
+  returning id into qid;
+  insert into review_log (question_id, reviewer_id, stage, verdict, checklist, reason)
+  values (qid, (p->>'author_id')::uuid, 1, 'pass', p_checklist, p_reason);
+  return qid;
+end;
+$$;
+
 -- ── 풀이 (쓰기: 퀴즈 모듈) ─────────────────────────────
 create table if not exists reports (
   question_id uuid not null references questions(id) on delete cascade,
@@ -296,5 +321,6 @@ alter table mcp_tokens enable row level security;
 alter table signup_attempts enable row level security;
 revoke all on question_status from anon, authenticated;
 revoke execute on function add_course_owner() from public, anon, authenticated;
+revoke execute on function submit_question(jsonb, jsonb, text) from public, anon, authenticated;
 revoke execute on function match_chunks(uuid, vector, int) from public, anon, authenticated;
 revoke execute on function concept_importance(uuid, vector, float) from public, anon, authenticated;

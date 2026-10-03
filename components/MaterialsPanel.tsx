@@ -2,12 +2,12 @@
 // 교안 업로드 (FR-01, 담당: 이제민). PDF는 브라우저에서 쪽별 글자만 뽑아 보내고 원본은 올리지 않는다.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api-client";
+import { fitsUpload } from "@/lib/upload";
 
 type Material = { id: string; no: number; filename: string; status: string; chunkCount: number; error: string | null };
 
 const MIN_BYTES = 1024;
 const MAX_BYTES = 50 * 1024 * 1024;
-const MAX_TEXT = 3_500_000; // 서버 요청 크기 제한(4.5MB) 안에 들어가도록
 
 async function sha256(buf: ArrayBuffer) {
   const digest = await crypto.subtle.digest("SHA-256", buf);
@@ -18,7 +18,8 @@ async function extractPages(buf: ArrayBuffer) {
   const { getDocumentProxy, extractText } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(buf));
   const { text } = await extractText(pdf, { mergePages: false });
-  return (text as string[]).map((t, i) => ({ page: i + 1, text: t.slice(0, 6000) }));
+  // 쪽 글자는 자르지 않는다. 너무 크면 업로드 전에 거절한다.
+  return (text as string[]).map((t, i) => ({ page: i + 1, text: t }));
 }
 
 function statusLabel(m: Material) {
@@ -77,15 +78,11 @@ export default function MaterialsPanel({ courseId }: { courseId: string }) {
         throw new Error("PDF를 열 수 없어요. 암호가 걸렸거나 손상된 파일인지 확인해 주세요");
       }
       if (!pages.some((p) => p.text.trim())) throw new Error("텍스트를 추출할 수 없습니다");
-      if (pages.reduce((s, p) => s + p.text.length, 0) > MAX_TEXT) {
-        throw new Error("교안의 글자가 너무 많아요. 파일을 나눠서 올려 주세요");
+      const body = { filename: file.name, fileHash, sizeBytes: file.size, pages };
+      if (!fitsUpload(body)) {
+        throw new Error("교안의 글자가 너무 많아 한 번에 올릴 수 없어요(약 4MB 초과). PDF를 나눠서 올려 주세요");
       }
-      const { material } = await api<{ material: Material }>(`/api/courses/${courseId}/materials`, {
-        filename: file.name,
-        fileHash,
-        sizeBytes: file.size,
-        pages,
-      });
+      const { material } = await api<{ material: Material }>(`/api/courses/${courseId}/materials`, body);
       setMaterials((ms) => [...ms, material]);
       setMessage({ kind: "ok", text: `${file.name} 업로드 완료. 분석을 시작해요.` });
       await index(material.id);
@@ -126,7 +123,7 @@ export default function MaterialsPanel({ courseId }: { courseId: string }) {
               </span>
               <span className="flex items-center gap-2">
                 {statusLabel(m)}
-                {(m.status === "failed" || m.status === "uploaded") && (
+                {m.status !== "ready" && (
                   <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => index(m.id)}>
                     다시 시도
                   </button>

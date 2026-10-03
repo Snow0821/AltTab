@@ -76,7 +76,38 @@ try {
   const after = await sql`select role from course_members where course_id = ${c1.id} and user_id = ${other}`;
   check("참여 후 다른 계정은 member다", after.length === 1 && after[0].role === "member");
 
-  // 4) 익명 키로는 표를 읽을 수 없다(RLS)
+  // 4) 문항과 1차 검수 기록은 함께 저장되거나 함께 취소된다(submit_question)
+  const { data: concept, error: ec } = await admin
+    .from("concepts")
+    .insert({ course_id: c1.id, author_id: owner, name: "점검 개념", summary: "점검용", evidence_refs: ["1:1"] })
+    .select("id")
+    .single();
+  if (ec) throw ec;
+  const q = (body) => ({
+    course_id: c1.id, concept_id: concept.id, author_id: owner, difficulty: 3, qtype: "short", body, body_norm: body,
+    choices: null, answer: "LIFO", accepted_answers: ["LIFO", "후입선출"], explanation: "점검", evidence_refs: ["1:1"], check_note: "점검", evidence_score: 0.5,
+  });
+  const checklist = { answer_correct: true, evidence_match: true, difficulty_fit: true, choices_clear: true };
+  const { data: qid, error: eq } = await admin.rpc("submit_question", { p: q("스택의 꺼내는 순서는?"), p_checklist: checklist, p_reason: "점검" });
+  const logs = qid ? await sql`select stage from review_log where question_id = ${qid}` : [];
+  check("문항 저장 시 1차 검수 기록이 함께 생긴다", !eq && logs.length === 1 && logs[0].stage === 1, eq?.message ?? "");
+  await sql.unsafe(`
+    create or replace function db_check_fail_review() returns trigger language plpgsql as $$
+    begin
+      if new.reason = '__inject_fail__' then raise exception 'injected review failure'; end if;
+      return new;
+    end $$;
+    drop trigger if exists db_check_fail_review on review_log;
+    create trigger db_check_fail_review before insert on review_log for each row execute function db_check_fail_review();
+  `);
+  const { error: ef } = await admin.rpc("submit_question", { p: q("큐의 꺼내는 순서는?"), p_checklist: checklist, p_reason: "__inject_fail__" });
+  const leftover = await sql`select count(*)::int as n from questions where body = '큐의 꺼내는 순서는?'`;
+  check("검수 기록 저장 실패 시 문항도 남지 않는다", !!ef && leftover[0].n === 0, `남은 문항 ${leftover[0].n}개`);
+  await sql.unsafe(`drop trigger if exists db_check_fail_review on review_log; drop function if exists db_check_fail_review();`);
+  const { error: er } = await admin.rpc("submit_question", { p: q("큐의 꺼내는 순서는?"), p_checklist: checklist, p_reason: "점검" });
+  check("실패 뒤 다시 보내면 문항과 검수 기록이 정상 저장된다", !er, er?.message ?? "");
+
+  // 5) 익명 키로는 표를 읽을 수 없다(RLS)
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (anonKey) {
     const anon = createClient(url, anonKey, { auth: { persistSession: false } });

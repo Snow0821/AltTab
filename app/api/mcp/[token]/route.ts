@@ -4,10 +4,19 @@ import { createHash } from "node:crypto";
 import { db } from "@/lib/supabase-admin";
 import { HttpError } from "@/lib/http";
 import { TOOLS, ToolError } from "@/lib/mcp/tools";
+import { checkTransport, VERSIONS, DEFAULT_ALLOWED_ORIGINS } from "@/lib/mcp/transport";
 
 export const maxDuration = 60;
 
-const VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+const ALLOWED_ORIGINS = process.env.MCP_ALLOWED_ORIGINS
+  ? process.env.MCP_ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : DEFAULT_ALLOWED_ORIGINS;
+
+function selfOrigin(req: Request) {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  return host ? `${proto}://${host}` : new URL(req.url).origin;
+}
 const INSTRUCTIONS =
   "PassFinder는 교안으로 시험 대비 문항을 만들고 같은 수업 학생끼리 검수하는 서비스다. 문제 만들기 순서: list_courses → get_course_context(교안 읽기) → submit_concepts(개념 등록) → get_question_bank → submit_questions(1차 검수 후 제출). 다른 학생 문항 검수: get_review_batch → submit_reviews.";
 
@@ -65,6 +74,9 @@ async function handleMessage(msg: Rpc, userId: string | null, req: Request) {
 
 export async function POST(req: Request, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
+  // 도구를 실행하기 전에 출처와 프로토콜 버전을 확인한다
+  const transport = checkTransport(req.headers, selfOrigin(req), ALLOWED_ORIGINS);
+  if (!transport.ok) return Response.json(error(null, -32600, transport.message), { status: transport.status });
   let body: Rpc | Rpc[];
   try {
     body = await req.json();
