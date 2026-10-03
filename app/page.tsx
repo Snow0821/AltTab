@@ -5,6 +5,31 @@ import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { api, ApiError } from "@/lib/api-client";
 
+// 체험 안내: 체험 과목 참여 코드는 배포 환경 변수로만 받는다(코드에 고정하지 않음)
+const DEMO_CODE = process.env.NEXT_PUBLIC_DEMO_JOIN_CODE ?? "";
+
+function DemoNotice() {
+  return (
+    <div className="card space-y-2 text-sm">
+      <p className="font-semibold">처음이라면 체험 과목으로 시작해 보세요</p>
+      {DEMO_CODE ? (
+        <p>
+          가입 뒤 "참여 코드로 들어가기"에 <span className="font-mono text-base font-bold tracking-widest">{DEMO_CODE}</span>를 넣으면 운영체제 체험 과목에서 바로 스테이지를 풀 수 있어요.
+        </p>
+      ) : (
+        <p className="text-[var(--muted)]">체험 과목은 준비 중이에요.</p>
+      )}
+      <p>
+        직접 올려 보려면{" "}
+        <a className="underline" href="/demo/운영체제_체험교안.pdf" download>
+          체험용 교안 PDF(10쪽)
+        </a>
+        를 내려받아 새 과목에 올려 보세요. 팀이 직접 쓴 요약 교안이에요.
+      </p>
+    </div>
+  );
+}
+
 type Course = {
   id: string;
   title: string;
@@ -58,6 +83,7 @@ function AuthForm() {
           교안을 올리고 내 AI에게 문제를 만들게 하면, 쉬운 개념부터 5문제씩 풀며 시험 범위를 끝까지 확인할 수 있어요.
         </p>
       </div>
+      <DemoNotice />
       <form onSubmit={submit} className="card space-y-3">
         <div className="flex gap-2">
           <button type="button" className={`btn ${mode === "login" ? "" : "btn-ghost"}`} onClick={() => setMode("login")}>
@@ -159,6 +185,7 @@ function CourseList() {
         </form>
       </div>
       {formError && <p className="msg-error">{formError}</p>}
+      {courses?.length === 0 && <DemoNotice />}
 
       {error && (
         <div className="card space-y-2">

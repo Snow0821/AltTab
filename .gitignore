@@ -9,3 +9,7 @@ next-env.d.ts
 !.env.example
 .vercel
 *.pdf
+# 체험용 교안(팀이 직접 쓴 자료)은 공개한다
+!public/demo/*.pdf
+# 시드 스크립트가 만든 시험 계정 정보
+demo/*.local.json
