@@ -73,7 +73,7 @@ export default function StageMap({ courseId, courseTitle }: { courseId: string; 
   if (!data.stages.length)
     return (
       <div className="card text-[var(--muted)]">
-        아직 스테이지가 없어요. 내 AI에 MCP 주소를 등록하고 개념을 만들어 달라고 해 보세요. 아래 &quot;MCP 주소 복사&quot;에서 시작할 수 있어요.
+        아직 스테이지가 없어요. 교안을 올린 뒤 &apos;AI로 첫 유닛 문제 만들기&apos;를 누르거나, 내 AI에 MCP 주소를 등록해 만들어 달라고 해 보세요
       </div>
     );
 

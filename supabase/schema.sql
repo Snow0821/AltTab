@@ -253,6 +253,27 @@ create table if not exists mcp_tokens (
   last_used_at timestamptz
 );
 
+-- ── 웹 AI 생성 기록 (쓰기: AI 생성 모듈, FR-12) ─────────
+-- 과목당 하루 상한, 동시 생성 막기, 사용한 모델·토큰 기록(원가 재계산)에 쓴다.
+create table if not exists ai_generations (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid not null references courses(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'running' check (status in ('running', 'done', 'failed')),
+  provider text,
+  model text,
+  prompt_tokens integer,
+  completion_tokens integer,
+  concepts_saved integer,
+  questions_made integer,
+  questions_passed integer,
+  questions_rejected integer,
+  error text,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+create index if not exists ai_generations_course_time on ai_generations (course_id, created_at);
+
 -- ── 유도 속성: 문항 상태 ──────────────────────────────
 -- 검증 완료 = 출제자가 아닌 서로 다른 학생 2명이 2차 통과
 -- 숨김     = 2차 불합격 2건 이상 또는 신고 3건 이상 (숨김이 우선)
@@ -319,6 +340,7 @@ alter table payments enable row level security;
 alter table entitlements enable row level security;
 alter table mcp_tokens enable row level security;
 alter table signup_attempts enable row level security;
+alter table ai_generations enable row level security;
 revoke all on question_status from anon, authenticated;
 revoke execute on function add_course_owner() from public, anon, authenticated;
 revoke execute on function submit_question(jsonb, jsonb, text) from public, anon, authenticated;

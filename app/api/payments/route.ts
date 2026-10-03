@@ -6,11 +6,8 @@ import { requireMember } from "@/lib/access";
 import { handle, ok, readJson, HttpError } from "@/lib/http";
 import { accessInfo } from "@/lib/entitlement";
 import { str, oneOf } from "@/lib/validate";
+import { PRODUCTS } from "@/lib/config";
 
-const PRODUCTS = {
-  course_pass: { amount: 2900, label: "과목 이용권" },
-  exam_30d: { amount: 9900, label: "시험 기간 구독 30일" },
-} as const;
 
 export const POST = handle(async (req) => {
   const user = await requireUser(req);
@@ -57,7 +54,7 @@ export const POST = handle(async (req) => {
     kind: product,
     course_id: product === "course_pass" ? courseId : null,
     payment_id: payment.id,
-    expires_at: product === "exam_30d" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
+    expires_at: product === "exam_30d" ? new Date(Date.now() + PRODUCTS.exam_30d.days * 24 * 60 * 60 * 1000).toISOString() : null,
   });
   if (e3) throw e3;
   return ok({ status: "paid", access: await accessInfo(user.id, courseId) });

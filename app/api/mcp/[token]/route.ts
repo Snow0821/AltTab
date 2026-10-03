@@ -2,7 +2,7 @@
 // 지원 메서드: initialize, notifications/*, ping, tools/list, tools/call. 알림 스트림(GET)은 지원하지 않는다(405).
 import { createHash } from "node:crypto";
 import { db } from "@/lib/supabase-admin";
-import { HttpError } from "@/lib/http";
+import { HttpError, ConfigError } from "@/lib/http";
 import { TOOLS, ToolError } from "@/lib/mcp/tools";
 import { checkTransport, VERSIONS, DEFAULT_ALLOWED_ORIGINS } from "@/lib/mcp/transport";
 
@@ -92,6 +92,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
   try {
     userId = await userFromToken(token);
   } catch (e) {
+    if (e instanceof ConfigError) {
+      return Response.json(error(null, -32603, "서비스를 준비하고 있어요. 잠시 후 다시 시도해 주세요"), { status: 503 });
+    }
     console.error("token lookup failed", e);
     return Response.json(error(null, -32603, "잠시 문제가 생겼어요. 다시 시도해 주세요"), { status: 500 });
   }

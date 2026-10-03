@@ -14,8 +14,13 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, body?: unknown, method?: string): Promise<T> {
-  const { data } = await supabaseBrowser().auth.getSession();
-  const token = data.session?.access_token;
+  let token: string | undefined;
+  try {
+    const { data } = await supabaseBrowser().auth.getSession();
+    token = data.session?.access_token;
+  } catch {
+    throw new ApiError(503, "not_configured", "서비스를 준비하고 있어요. 잠시 후 다시 시도해 주세요", {});
+  }
   let res: Response;
   try {
     res = await fetch(path, {

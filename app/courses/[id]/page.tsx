@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api-client";
 import MaterialsPanel from "@/components/MaterialsPanel";
 import McpPanel from "@/components/McpPanel";
 import StageMap from "@/components/StageMap";
+import AiGeneratePanel from "@/components/AiGeneratePanel";
 
 type CourseInfo = {
   course: { id: string; title: string; joinCode: string; role: string };
@@ -16,6 +17,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   const [info, setInfo] = useState<CourseInfo | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"materials" | "mcp" | "invite">("materials");
+  const [mapVersion, setMapVersion] = useState(0);
 
   useEffect(() => {
     api<CourseInfo>(`/api/courses/${id}`)
@@ -33,7 +35,9 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         {info.access.has && <span className="rounded-full bg-[var(--ok)] px-2 py-0.5 text-xs text-white">이용 중</span>}
       </div>
 
-      <StageMap courseId={id} courseTitle={info.course.title} />
+      <StageMap key={mapVersion} courseId={id} courseTitle={info.course.title} />
+
+      <AiGeneratePanel courseId={id} onDone={() => setMapVersion((v) => v + 1)} />
 
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2">

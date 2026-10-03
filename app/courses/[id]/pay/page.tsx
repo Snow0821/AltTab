@@ -3,10 +3,9 @@
 import { use, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api-client";
 
-const PRODUCTS = [
-  { id: "course_pass", title: "과목 이용권 2,900원", detail: "이 과목, 기간 제한 없음. 6번째 스테이지부터 이어서 풀 수 있어요." },
-  { id: "exam_30d", title: "시험 기간 구독 9,900원", detail: "결제한 때부터 30일, 모든 과목. 과목이 3개 이상이면 더 유리해요." },
-] as const;
+import { PRODUCTS as PRODUCT_CONFIG } from "@/lib/config";
+
+const PRODUCTS = (Object.keys(PRODUCT_CONFIG) as (keyof typeof PRODUCT_CONFIG)[]).map((id) => ({ id, ...PRODUCT_CONFIG[id] }));
 
 export default function PayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

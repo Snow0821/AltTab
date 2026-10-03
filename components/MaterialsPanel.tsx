@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api-client";
 import { fitsUpload } from "@/lib/upload";
+import { LIMITS } from "@/lib/config";
 
 type Material = { id: string; no: number; filename: string; status: string; chunkCount: number; error: string | null };
 
-const MIN_BYTES = 1024;
-const MAX_BYTES = 50 * 1024 * 1024;
+const MIN_BYTES = LIMITS.materialMinBytes;
+const MAX_BYTES = LIMITS.materialMaxBytes;
 
 async function sha256(buf: ArrayBuffer) {
   const digest = await crypto.subtle.digest("SHA-256", buf);
@@ -66,7 +67,7 @@ export default function MaterialsPanel({ courseId }: { courseId: string }) {
     }
     if (file.size < MIN_BYTES) return setMessage({ kind: "error", text: "1KB보다 작은 파일은 올릴 수 없어요" });
     if (file.size > MAX_BYTES) return setMessage({ kind: "error", text: "50MB보다 큰 파일은 올릴 수 없어요" });
-    if (materials.length >= 20) return setMessage({ kind: "error", text: "교안은 과목마다 20개까지 올릴 수 있어요" });
+    if (materials.length >= LIMITS.materialsPerCourse) return setMessage({ kind: "error", text: "교안은 과목마다 20개까지 올릴 수 있어요" });
     setBusy(true);
     try {
       const buf = await file.arrayBuffer();

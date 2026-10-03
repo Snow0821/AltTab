@@ -13,6 +13,9 @@ export class HttpError extends Error {
   }
 }
 
+// 배포 환경 변수가 아직 없을 때(예: Supabase 연결 전) 쓰는 오류. 500 대신 503 안내로 바꾼다.
+export class ConfigError extends Error {}
+
 export function ok(data: unknown, status = 200) {
   return Response.json(data, { status });
 }
@@ -29,6 +32,7 @@ export function handle<C>(fn: (req: Request, ctx: C) => Promise<Response>) {
     } catch (e) {
       if (e instanceof HttpError) return fail(e.status, e.code, e.message, e.extra);
       if (e instanceof InvalidInput) return fail(400, "invalid", e.message);
+      if (e instanceof ConfigError) return fail(503, "not_configured", "서비스를 준비하고 있어요. 잠시 후 다시 시도해 주세요");
       console.error(e);
       return fail(500, "server_error", "잠시 문제가 생겼어요. 다시 시도해 주세요");
     }

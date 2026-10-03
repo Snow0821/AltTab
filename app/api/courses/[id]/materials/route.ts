@@ -5,11 +5,12 @@ import { requireUser } from "@/lib/auth";
 import { requireMember } from "@/lib/access";
 import { handle, ok, readJson, HttpError } from "@/lib/http";
 import { chunkPages } from "@/lib/chunk";
+import { LIMITS } from "@/lib/config";
 import { str, int, arrayOf, asObject, InvalidInput } from "@/lib/validate";
 
-const MAX_FILES = 20;
-const MIN_BYTES = 1024;
-const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_FILES = LIMITS.materialsPerCourse;
+const MIN_BYTES = LIMITS.materialMinBytes;
+const MAX_BYTES = LIMITS.materialMaxBytes;
 
 type Ctx = { params: Promise<{ id: string }> };
 

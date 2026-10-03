@@ -7,6 +7,7 @@ import { embed, cosine, parseVector, EmbedError } from "../embed";
 import { parseRef } from "../chunk";
 import { normalizeBody, orderStages, unitOf, type ConceptNode } from "../rules";
 import { reviewableQuestionIds, statusOf } from "../review";
+import { QUALITY } from "../config";
 
 export class ToolError extends Error {}
 
@@ -18,8 +19,8 @@ export type Tool = {
   run: (userId: string, args: Args, req: Request) => Promise<unknown>;
 };
 
-const EVIDENCE_MIN = 0.5; // PRD FR-03 근거 불일치 기준(qwen3-embedding-4b 관련 0.898·무관 0.346 실측)
-const IMPORTANCE_MIN = 0.6; // 개념과 관련 있다고 보는 청크 유사도
+const EVIDENCE_MIN = QUALITY.evidenceMin; // PRD FR-03 근거 불일치 기준(lib/config.ts)
+const IMPORTANCE_MIN = QUALITY.importanceMin; // 개념과 관련 있다고 보는 청크 유사도
 const CHECK_NAMES: Record<string, string> = {
   answer_correct: "정답",
   evidence_match: "근거 일치",

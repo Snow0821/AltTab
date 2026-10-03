@@ -2,7 +2,7 @@
 // 첫 화면: 가입·로그인, 내 과목 목록, 새 과목, 참여 코드로 들어가기 (FR-01)
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { supabaseBrowser, supabaseConfigured } from "@/lib/supabase-browser";
 import { api, ApiError } from "@/lib/api-client";
 
 // 체험 안내: 체험 과목 참여 코드는 배포 환경 변수로만 받는다(코드에 고정하지 않음)
@@ -42,14 +42,16 @@ type Course = {
 };
 
 export default function Home() {
-  const [state, setState] = useState<"loading" | "out" | "in">("loading");
+  const [state, setState] = useState<"loading" | "out" | "in" | "unconfigured">("loading");
   useEffect(() => {
+    if (!supabaseConfigured()) return setState("unconfigured");
     const sb = supabaseBrowser();
     sb.auth.getSession().then(({ data }) => setState(data.session ? "in" : "out"));
     const { data } = sb.auth.onAuthStateChange((_e, s) => setState(s ? "in" : "out"));
     return () => data.subscription.unsubscribe();
   }, []);
   if (state === "loading") return <p className="text-[var(--muted)]">불러오는 중…</p>;
+  if (state === "unconfigured") return <p className="card">서비스를 준비하고 있어요. 잠시 후 다시 접속해 주세요.</p>;
   return state === "out" ? <AuthForm /> : <CourseList />;
 }
 
