@@ -20,7 +20,7 @@ npm install
 npm start
 ```
 
-브라우저에서 `http://localhost:3000/study/make.html`로 접속합니다. 실제 AI 생성에는 서버의 `KOOKMIN_KEY` 설정이 필요합니다.
+브라우저에서 `http://localhost:3000/`로 접속하면 `index.html`의 통합 화면이 열립니다. AI 문제 만들기는 `/study/make.html`, 기존 PDF 업로드 화면은 `/upload`에서 이용할 수 있습니다. 실제 AI 생성에는 서버의 `KOOKMIN_KEY` 설정이 필요합니다.
 
 ## 배포
 

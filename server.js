@@ -76,10 +76,10 @@ app.use('/uploads', (req, res, next) => {
   if (!req.path.toLowerCase().endsWith('.pdf')) return res.sendStatus(404);
   next();
 }, express.static(uploadDir, { index: false }));
-// Isolated, sample-only exam UI. Existing upload home and data flow remain unchanged.
+// Study screens are served independently of the main entry page.
 app.use('/study', express.static(path.join(__dirname, 'public', 'exam-workspace')));
-// Integrated entry; preserve the existing PDF upload home.
-app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// Serve the integrated entry at both the site root and its explicit file URL.
+app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 function renderPage(fileList, message) {
   const items = fileList.map((f) => `
@@ -128,7 +128,8 @@ function renderPage(fileList, message) {
 </html>`;
 }
 
-app.get('/', (req, res) => {
+// Keep the original PDF upload screen available for later use.
+app.get('/upload', (req, res) => {
   res.send(renderPage(readMetadata()));
 });
 
@@ -149,7 +150,7 @@ app.post('/upload', (req, res) => {
       uploadedAt: new Date().toLocaleString('ko-KR')
     });
     writeMetadata(list);
-    res.redirect('/');
+    res.redirect('/upload');
   });
 });
 
