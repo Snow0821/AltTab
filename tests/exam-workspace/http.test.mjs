@@ -24,6 +24,8 @@ test('index is the home page, study assets serve correctly, and PDF upload flow 
     const origin = `http://127.0.0.1:${port}`;
     const home = await fetch(origin); assert.equal(home.status, 200);
     const homeText = await home.text();
+    assert.match(homeText, /YOUR STUDY SPACE/);
+    assert.doesNotMatch(homeText, /<iframe/);
     assert.equal(homeText, await readFile(path.join(root, 'index.html'), 'utf8'));
     const index = await fetch(`${origin}/index.html`); assert.equal(index.status, 200);
     assert.equal(await index.text(), homeText);

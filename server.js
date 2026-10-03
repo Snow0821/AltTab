@@ -97,16 +97,16 @@ function renderPage(fileList, message) {
 <title>PassFinder - 교안 업로드</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px 16px; background: #f7f7fb; color: #1a1a1a; }
+  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px 16px; background: #f6f8f7; color: #1a1a1a; }
   h1 { font-size: 1.4rem; }
   h2 { font-size: 1.1rem; margin-top: 28px; }
   form { display: flex; flex-direction: column; gap: 12px; background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   input[type=file] { padding: 8px; border: 1px solid #ddd; border-radius: 8px; width: 100%; }
-  button { padding: 10px 16px; border: none; border-radius: 8px; background: #4f46e5; color: #fff; font-size: 1rem; cursor: pointer; }
-  button:hover { background: #4338ca; }
+  button { padding: 10px 16px; border: none; border-radius: 8px; background: #0d806c; color: #fff; font-size: 1rem; cursor: pointer; }
+  button:hover { background: #086c5b; }
   ul { list-style: none; padding: 0; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
   .file-item { background: #fff; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-  .file-item a { color: #4f46e5; text-decoration: none; font-weight: 600; word-break: break-all; }
+  .file-item a { color: #0d806c; text-decoration: none; font-weight: 600; word-break: break-all; }
   .meta { font-size: 0.8rem; color: #777; white-space: nowrap; }
   .message { margin-top: 12px; padding: 10px; border-radius: 8px; background: #e0f2fe; color: #075985; font-size: 0.9rem; }
   .error { background: #fee2e2; color: #991b1b; }
@@ -114,6 +114,7 @@ function renderPage(fileList, message) {
 </style>
 </head>
 <body>
+  <p><a href="/">← 내 과목</a></p>
   <h1>교안 PDF 업로드</h1>
   <p><a href="/study/make.html">교안으로 AI 문제 5개 만들고 공부하기 →</a></p>
   <p>개인 AI 계정 없이 이용할 수 있어요. 문제와 풀이 기록은 이 브라우저에 저장돼요.</p>
@@ -129,7 +130,7 @@ function renderPage(fileList, message) {
 }
 
 // Keep the original PDF upload screen available for later use.
-app.get('/upload', (req, res) => {
+app.get(['/upload', '/materials-upload'], (req, res) => {
   res.send(renderPage(readMetadata()));
 });
 
