@@ -7,8 +7,8 @@ const SUPABASE_ORIGIN = 'https://ltxuvtunctrayeewbwyd.supabase.co';
 const TABLE_URL = `${SUPABASE_ORIGIN}/rest/v1/alttab_connection_test`;
 const LLM_URL = 'https://ai.cs.kookmin.ac.kr/v1/messages';
 const MODEL = 'claude-haiku-4-5';
-// This public demonstration is intentionally short-lived. Changing the window or
-// resetting llm_claimed_at requires a new decision about the demo/cost allowance.
+// The public demonstration remains short-lived; repeated manual AI tests are
+// allowed. Provider billing is not calculated or capped by this module.
 const DEMO_END = '2026-10-03T11:00:00.000Z'; // 20:00 KST
 const MAX_TEXT_CHARS = 200;
 const MAX_INPUT_BYTES = 800;
@@ -31,7 +31,7 @@ function publicStatus(env, now) {
     ok: true,
     mode: 'live-demo',
     db: { configured: Boolean(env.SUPABASE_KEY), tested: false },
-    llm: { configured: Boolean(env.KOOKMIN_KEY), tested: false, model: MODEL, maxCalls: 1, maxOutputTokens: MAX_OUTPUT_TOKENS },
+    llm: { configured: Boolean(env.KOOKMIN_KEY), tested: false, model: MODEL, maxOutputTokens: MAX_OUTPUT_TOKENS },
     expired: now() >= Date.parse(DEMO_END),
     expiresAt: DEMO_END,
     publicDemo: true,
@@ -96,7 +96,7 @@ function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Da
 
   async function request(url, options, kind) {
     // A preceding DB request may finish after the window closed. Recheck at
-    // every outbound boundary; a claimed LLM attempt is never refunded.
+    // every outbound boundary, including immediately before the AI request.
     if (now() >= Date.parse(DEMO_END)) fail(410, 'demo_expired', '오늘의 연결 시연 시간이 끝났어요. 추가 실행은 운영자 확인이 필요해요.');
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), kind === 'llm' ? 25000 : 8000);
@@ -106,7 +106,7 @@ function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Da
         await response.body?.cancel(); // Never return/log provider bodies or credentials.
         if (kind === 'db' && response.status === 404) fail(503, 'db_table_missing', '테스트 테이블이 아직 없거나 REST API에서 확인되지 않아요.');
         if (response.status === 401 || response.status === 403) fail(502, `${kind}_auth_failed`, '서버 키의 인증 또는 권한을 확인해 주세요.');
-        fail(502, `${kind}_failed`, kind === 'llm' ? '학교 AI가 요청을 완료하지 못했어요. 비용 확인 전에는 다시 호출하지 않아요.' : 'DB 요청을 완료하지 못했어요.');
+        fail(502, `${kind}_failed`, kind === 'llm' ? '학교 AI가 요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.' : 'DB 요청을 완료하지 못했어요.');
       }
       if (response.status === 204 || options.headers?.Prefer?.includes('return=minimal')) return null;
       return await readBoundedJson(response);
@@ -121,8 +121,7 @@ function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Da
     status: () => publicStatus(env, now),
     async saveAndRead(value) {
       const headers = dbHeaders();
-      // Only one synthetic row exists. Do not include llm_claimed_at here: saving
-      // another DB value must NEVER replenish the durable one-call allowance.
+      // Only one synthetic row exists. Keep prior call-history fields unchanged.
       await request(`${TABLE_URL}?on_conflict=id`, {
         method: 'POST',
         headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -137,16 +136,10 @@ function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Da
     async chat(message) {
       if (!env.KOOKMIN_KEY) fail(503, 'llm_not_configured', '서버에 KOOKMIN_KEY가 설정되지 않았어요.');
       const headers = dbHeaders();
-      // Atomic conditional update in Postgres, shared by ALL server instances.
-      // Claim before calling the provider. Even uncertain errors consume the one
-      // attempt so retries cannot silently incur another charge.
-      const claim = await request(`${TABLE_URL}?id=eq.true&llm_claimed_at=is.null&select=id`, {
-        method: 'PATCH',
-        headers: { ...headers, Prefer: 'return=representation' },
-        body: JSON.stringify({ llm_claimed_at: new Date(now()).toISOString() }),
-      }, 'db');
-      if (!Array.isArray(claim) || claim.length !== 1 || claim[0].id !== true) {
-        fail(409, 'llm_allowance_unavailable', '먼저 DB 저장·읽기를 완료해 주세요. 이미 전역 1회 호출을 썼다면 추가 승인이 필요해요.');
+      // Check the DB step without consuming or resetting a one-shot allowance.
+      const rows = await request(`${TABLE_URL}?id=eq.true&select=id&limit=1`, { method: 'GET', headers }, 'db');
+      if (!Array.isArray(rows) || rows.length !== 1 || rows[0].id !== true) {
+        fail(409, 'db_test_required', '먼저 DB 저장·읽기를 완료해 주세요.');
       }
       const data = await request(LLM_URL, {
         method: 'POST',
@@ -154,10 +147,10 @@ function makeService({ env = process.env, fetchImpl = globalThis.fetch, now = Da
         body: JSON.stringify({ model: MODEL, max_tokens: MAX_OUTPUT_TOKENS, stream: false, messages: [{ role: 'user', content: message }] }),
       }, 'llm');
       const reply = Array.isArray(data.content) ? data.content.filter((part) => part?.type === 'text' && typeof part.text === 'string').map((part) => part.text).join('').slice(0, 4000) : '';
-      if (!reply.trim()) fail(502, 'llm_empty_response', '학교 AI에 요청했지만 텍스트 답변을 받지 못했어요. 호출권은 사용되었어요.');
+      if (!reply.trim()) fail(502, 'llm_empty_response', '학교 AI에 요청했지만 텍스트 답변을 받지 못했어요.');
       const usage = data.usage && Number.isInteger(data.usage.input_tokens) && Number.isInteger(data.usage.output_tokens)
         ? { inputTokens: data.usage.input_tokens, outputTokens: data.usage.output_tokens } : null;
-      return { ok: true, source: 'school-ai', model: MODEL, reply, usage, truncated: data.stop_reason === 'max_tokens', allowanceRemaining: 0 };
+      return { ok: true, source: 'school-ai', model: MODEL, reply, usage, truncated: data.stop_reason === 'max_tokens' };
     },
   };
 }
@@ -172,8 +165,8 @@ function registerConnectionCheck(app, options = {}) {
   router.use((req, res, next) => {
     res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     if (req.method !== 'POST') { res.set('Allow', 'POST'); return res.status(405).json({ ok: false, error: 'method_not_allowed', message: 'POST 요청만 허용해요.' }); }
-    // CSRF/drive-by protection, NOT authentication. The user approved a public,
-    // one-call demo; curl clients can supply Origin, so the DB quota is essential.
+    // CSRF/drive-by protection, NOT authentication. The user approved a public
+    // repeatable demo; non-browser clients can also supply this Origin header.
     if (!origins.has(req.get('origin')) || (req.get('sec-fetch-site') && !['same-origin', 'none'].includes(req.get('sec-fetch-site')))) {
       return res.status(403).json({ ok: false, error: 'origin_rejected', message: '같은 사이트의 테스트 화면에서 요청해 주세요.' });
     }

@@ -39,7 +39,9 @@ test('UI sequences DB then AI, prevents double submits, and renders values as te
   assert.equal(calls.filter(c => c.endsWith('/chat')).length, 1);
   assert.equal(ctx.q('#llm-result img'), null);
   assert.match(ctx.q('#llm-result').textContent, /<img/);
-  assert.equal(ctx.q('#llm-submit').disabled, true);
+  assert.equal(ctx.q('#llm-submit').disabled, false);
+  ctx.submit('llm-form');
+  await waitFor(() => calls.filter(c => c.endsWith('/chat')).length === 2 && !ctx.q('#llm-submit').disabled);
 });
 
 test('failed DB preserves input and keeps AI disabled; no made-up success', async (t) => {
@@ -64,7 +66,7 @@ test('expired page and missing keys never enable outbound test buttons', async (
   }
 });
 
-test('uncertain AI failure is shown and cannot be automatically or repeatedly retried', async (t) => {
+test('AI failure permits a manual retry without automatically resending', async (t) => {
   let chatCalls = 0;
   const ctx = setup(async (url, options) => {
     if (url.endsWith('/status')) return response(status);
@@ -78,8 +80,9 @@ test('uncertain AI failure is shown and cannot be automatically or repeatedly re
   await waitFor(() => !ctx.q('#llm-submit').disabled);
   ctx.submit('llm-form');
   await waitFor(() => ctx.q('#llm-badge').textContent === '확인 실패');
-  ctx.submit('llm-form');
   assert.equal(chatCalls, 1);
-  assert.equal(ctx.q('#llm-submit').disabled, true);
-  assert.match(ctx.q('#llm-result').textContent, /다시 보내지 않아요/);
+  assert.equal(ctx.q('#llm-submit').disabled, false);
+  assert.match(ctx.q('#llm-result').textContent, /학교 AI에 닿지 못했어요/);
+  ctx.submit('llm-form');
+  await waitFor(() => chatCalls === 2 && !ctx.q('#llm-submit').disabled);
 });

@@ -1,17 +1,18 @@
 # AltTab Supabase와 Vercel 연결 점검
 
-문서 갱신 시각: 2026년 10월 3일 15:03 KST
+문서 갱신 시각: 2026년 10월 3일 15:16 KST
 
-## 최신 결과: 2026-10-03 15:01 KST 실제 웹 검증
+## 최신 결과: 2026-10-03 15:08 KST 실제 웹 검증
 
-**[연결 테스트 화면](https://alt-tab-mu.vercel.app/mock/)에서 Vercel 서버 → Supabase 저장·별도 읽기·값 정확 일치를 확인했습니다.**
+**[연결 테스트 화면](https://alt-tab-mu.vercel.app/mock/)에서 실제 DB 저장·읽기와 학교 LLM 입력·출력까지 확인했습니다. [사용법과 인수인계](connection-check.md)를 참고하세요.**
 
 - 구현 커밋: [ec458ca](https://github.com/Snow0821/AltTab/commit/ec458ca814e4b1a09709a2acbe39fd4d2d99e422). GitHub의 Vercel 상태 success 및 실제 배포 화면 확인
 - 실제 입력: `AltTab Vercel DB 테스트 2026-10-03`. 화면에 저장 ✓ / 읽기 ✓ / 정확히 일치 ✓ 표시, DB 직접 조회에서도 동일 값 확인
 - 현재 Express 연결 테스트가 쓰는 서버 변수는 `SUPABASE_KEY`, `KOOKMIN_KEY`. 배포 런타임이 두 변수의 존재를 확인했으며 실제 값은 조회·복사·출력하지 않음
 - 승인받은 격리 테이블 `public.alttab_connection_test` 1개 생성. 한 행만 유지, RLS 활성화·공개 정책 0개·익명 조회 0행 확인. 기존 앱 테이블/데이터는 변경하지 않음
-- **LLM 실호출은 아직 미실행.** 학교 요금표가 로그인 뒤에 있어 실제 단가·최소 요금·배율과 승인된 $0.01 상한을 검증하지 못함. 15:01 KST에 전역 1회 호출권이 미사용인 것을 확인
-- 공개 시연: DB 입력 200자, LLM 전체 방문자 합계 1회·출력 32토큰, 2026-10-03 20:00 KST 이후 쓰기/AI 호출 중지. 추가 호출권은 자동으로 복구하지 않음
+- **LLM 실제 1회 호출 성공 (15:08 KST).** 입력 `Reply only: OK` → 답변 `OK`, 모델 `claude-haiku-4-5`, 입력 11 / 출력 4토큰. 청구 금액은 API 응답에 없어 별도 미확인
+- 이후 요청에 따라 1회 사용 잠금을 제거해 반복 입력·출력이 가능하도록 변경. 과거 DB 호출 기록은 그대로 보존
+- 현재 시연 종료 시각은 2026-10-03 20:00 KST. 이어서 사용할 담당자는 [사용법](connection-check.md)의 파일 안내를 참고
 - 코드/HTTP/DOM 테스트 29개 통과. 클라우드 브라우저에서 실제 DB 버튼 흐름과 화면을 확인
 
 상세 범위·제한은 [연결 시연 안내](connection-check.md)를 참조하세요. 이 성공은 연결 테스트 테이블에 한정되며 점수·문제 세트 등 앱 전체가 Supabase 저장으로 전환됐다는 뜻은 아닙니다. Preview/Development별 환경 설정과 Vercel Marketplace 통합 설정은 별도 미확인입니다.

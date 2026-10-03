@@ -27,11 +27,8 @@ function fakeProvider(options = {}) {
       row = { llm_claimed_at: null, ...row, ...input };
       return new Response(null, { status: 204 });
     }
-    if (request.method === 'PATCH') {
-      if (!row || row.llm_claimed_at) return json([]);
-      row.llm_claimed_at = JSON.parse(request.body).llm_claimed_at;
-      return json([{ id: true }]);
-    }
+    assert.notEqual(request.method, 'PATCH');
+    if (url.includes('select=id')) return json(row ? [{ id: row.id }] : []);
     return json(row ? [{ value: options.mismatch ? 'different' : row.value }] : []);
   };
   return { fetchImpl, calls, getRow: () => row };
@@ -75,43 +72,46 @@ test('missing key or wrong project prevents outbound requests', async () => {
   await assert.rejects(makeService({ env: { ...ENV, SUPABASE_URL: 'https://evil.example' }, fetchImpl: neverFetch }).saveAndRead('test'), { code: 'db_target_mismatch' });
 });
 
-test('LLM is one global atomic call across concurrent server instances and DB saves never reset it', async () => {
-  const fake = fakeProvider({ row: { id: true, value: 'test', llm_claimed_at: null } });
+test('LLM allows explicit repeat calls even with prior usage history and never resets the DB record', async () => {
+  const priorClaim = '2026-10-03T05:00:00Z';
+  const fake = fakeProvider({ row: { id: true, value: 'test', llm_claimed_at: priorClaim } });
   const a = makeService({ env: ENV, now: NOW, fetchImpl: fake.fetchImpl });
   const b = makeService({ env: ENV, now: NOW, fetchImpl: fake.fetchImpl });
   const results = await Promise.allSettled([a.chat('안녕'), b.chat('안녕')]);
-  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+  assert.equal(results.filter(r => r.status === 'fulfilled').length, 2);
   const result = results.find(r => r.status === 'fulfilled').value;
   assert.equal(result.reply, '안녕하세요!');
   assert.equal(result.source, 'school-ai');
   const llm = fake.calls.filter(c => c.url === constants.LLM_URL);
-  assert.equal(llm.length, 1);
+  assert.equal(llm.length, 2);
   assert.equal(llm[0].request.headers['x-api-key'], ENV.KOOKMIN_KEY);
   assert.deepEqual(JSON.parse(llm[0].request.body), { model: 'claude-haiku-4-5', max_tokens: 32, stream: false, messages: [{ role: 'user', content: '안녕' }] });
   await a.saveAndRead('next input');
-  await assert.rejects(b.chat('again'), { code: 'llm_allowance_unavailable' });
-  assert.equal(fake.calls.filter(c => c.url === constants.LLM_URL).length, 1);
+  assert.equal((await b.chat('again')).reply, '안녕하세요!');
+  assert.equal(fake.calls.filter(c => c.url === constants.LLM_URL).length, 3);
+  assert.equal(fake.getRow().llm_claimed_at, priorClaim);
 });
 
-test('uncertain provider failure consumes the claim and redacts upstream error/secret', async () => {
+test('provider failure redacts secrets and never retries automatically', async () => {
   for (const mode of ['llmError', 'throwSecret']) {
     const fake = fakeProvider({ row: { id: true, value: 'test', llm_claimed_at: null }, [mode]: true });
     const service = makeService({ env: ENV, now: NOW, fetchImpl: fake.fetchImpl });
     await assert.rejects(service.chat('test'), (error) => !error.message.includes('secret'));
-    assert.ok(fake.getRow().llm_claimed_at);
-    await assert.rejects(service.chat('retry'), { code: 'llm_allowance_unavailable' });
+    assert.equal(fake.getRow().llm_claimed_at, null);
     assert.equal(fake.calls.filter(c => c.url === constants.LLM_URL).length, 1);
+    await assert.rejects(service.chat('manual retry'), (error) => !error.message.includes('secret'));
+    assert.equal(fake.calls.filter(c => c.url === constants.LLM_URL).length, 2);
   }
 });
 
 test('chat requires the DB row and a school key before it can make a paid call', async () => {
   const fake = fakeProvider();
-  await assert.rejects(makeService({ env: ENV, fetchImpl: fake.fetchImpl }).chat('test'), { code: 'llm_allowance_unavailable' });
+  await assert.rejects(makeService({ env: ENV, now: NOW, fetchImpl: fake.fetchImpl }).chat('test'), { code: 'db_test_required' });
   await assert.rejects(makeService({ env: { SUPABASE_KEY: ENV.SUPABASE_KEY }, fetchImpl: fake.fetchImpl }).chat('test'), { code: 'llm_not_configured' });
   assert.equal(fake.calls.filter(c => c.url === constants.LLM_URL).length, 0);
 });
 
-test('a DB claim finishing after the cutoff cannot start a paid call', async () => {
+test('a DB readiness check finishing after the cutoff cannot start a paid call', async () => {
   let time = Date.parse(constants.DEMO_END) - 1;
   const calls = [];
   const fetchImpl = async (url) => {
@@ -146,7 +146,8 @@ test('HTTP returns precise live DB result and safely serves mock assets', async 
   const server = await httpServer(t, { fetchImpl: fake.fetchImpl });
   const status = await (await server.post('status', {})).json();
   assert.equal(status.db.tested, false);
-  assert.equal(status.llm.maxCalls, 1);
+  assert.equal(status.llm.maxCalls, undefined);
+  assert.equal(status.llm.maxOutputTokens, 32);
   const result = await server.post('db', { value: '<b>synthetic</b>' });
   assert.equal(result.status, 200);
   assert.equal(result.headers.get('cache-control'), 'no-store');
