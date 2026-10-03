@@ -5,6 +5,7 @@ const fs = require('fs');
 const { z } = require('zod');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
+const { SSEServerTransport } = require('@modelcontextprotocol/sdk/server/sse.js');
 const { PDFParse } = require('pdf-parse');
 
 const app = express();
@@ -56,10 +57,16 @@ async function extractAndCacheText(storedName) {
   }
 }
 
+function fixMulterFilenameEncoding(originalname) {
+  // multer/busboy read multipart filename headers as latin1; browsers send UTF-8.
+  return Buffer.from(originalname, 'latin1').toString('utf8');
+}
+
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
-    const safeBase = path.basename(file.originalname, path.extname(file.originalname))
+    const fixedName = fixMulterFilenameEncoding(file.originalname);
+    const safeBase = path.basename(fixedName, path.extname(fixedName))
       .replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
       .slice(0, 60);
     cb(null, `${Date.now()}-${safeBase}.pdf`);
@@ -125,18 +132,39 @@ ${bodyHtml}
 }
 
 function mcpInstructionsHtml(req) {
-  const mcpUrl = `${req.protocol}://${req.get('host')}/mcp`;
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const streamableUrl = `${origin}/mcp`;
+  const sseUrl = `${origin}/sse`;
+  const promptText = 'list_materials로 업로드된 자료를 확인하고, get_material_text로 내용을 가져와서 4지선다 문제 5개를 만든 다음 submit_questions로 제출해줘.';
+
   return `
   <div class="mcp-box">
-    <h3>내 AI로 문제 만들기 (MCP 연동)</h3>
-    <p>이 서버는 자료 제공과 결과 저장만 담당합니다. 실제 문제 생성은 여러분이 이미 쓰고 있는 Claude Desktop, Cursor 같은 AI 클라이언트가 직접 수행합니다.</p>
+    <h3>Claude 사용자</h3>
     <ol>
-      <li>아래 MCP 서버 주소를 AI 클라이언트의 MCP(커넥터) 설정에 추가하세요.<br>
-        <input type="text" readonly value="${escapeHtml(mcpUrl)}" onclick="this.select()"></li>
-      <li>연결되면 AI에게 아래처럼 요청하세요:<br>
-        <code>list_materials로 업로드된 자료를 확인하고, get_material_text로 내용을 가져와서 4지선다 문제 5개를 만든 다음 submit_questions로 제출해줘.</code></li>
-      <li>제출이 끝나면 이 페이지에서 "생성된 문제 보기"로 확인할 수 있습니다.</li>
+      <li>아래 주소를 복사하세요.<br>
+        <input type="text" readonly value="${escapeHtml(streamableUrl)}" onclick="this.select()"></li>
+      <li>Claude Desktop(또는 claude.ai)에서 <strong>설정 → Connectors → Add custom connector</strong>를 누르고 방금 복사한 주소를 붙여넣으세요.</li>
     </ol>
+
+    <h3 style="margin-top:18px;">ChatGPT 사용자</h3>
+    <ol>
+      <li>아래 주소를 복사하세요.<br>
+        <input type="text" readonly value="${escapeHtml(sseUrl)}" onclick="this.select()"></li>
+      <li>ChatGPT에서 <strong>설정 → Security and login → Developer mode</strong>를 켠 다음, 커넥터 추가 화면에서 방금 복사한 주소를 붙여넣으세요.</li>
+    </ol>
+
+    <h3 style="margin-top:18px;">Gemini 사용자</h3>
+    <ol>
+      <li>아래 주소를 복사하세요.<br>
+        <input type="text" readonly value="${escapeHtml(streamableUrl)}" onclick="this.select()"></li>
+      <li>Gemini 앱의 <strong>Spark</strong> 기능 안에서 Connected Apps(커스텀 앱 연결)을 열고 방금 복사한 주소를 추가하세요.</li>
+      <li>개인 Google 계정(학교/회사 계정 불가), 18세 이상, 미국 리전, Keep Activity 설정이 켜져 있어야 동작합니다. 이 서버가 <code>localhost</code>인 동안에는 Gemini에서 연결되지 않으니, 공개 배포 후 그 주소로 다시 시도하세요.</li>
+    </ol>
+
+    <h3 style="margin-top:18px;">연결 후 공통</h3>
+    <p>연결이 끝나면 AI에게 아래처럼 요청하세요:<br>
+      <code>${escapeHtml(promptText)}</code></p>
+    <p>제출이 끝나면 이 페이지에서 "생성된 문제 보기"로 확인할 수 있습니다.</p>
   </div>`;
 }
 
@@ -216,7 +244,7 @@ app.post('/upload', (req, res) => {
 
     const list = readMetadata();
     list.unshift({
-      originalName: req.file.originalname,
+      originalName: fixMulterFilenameEncoding(req.file.originalname),
       storedName: req.file.filename,
       size: formatSize(req.file.size),
       uploadedAt: new Date().toLocaleString('ko-KR')
@@ -297,6 +325,38 @@ function buildMcpServer() {
     return { content: [{ type: 'text', text: `${questions.length}개의 문제가 저장되었습니다. 자료 ID: ${id}` }] };
   });
 
+  server.registerPrompt('generate_quiz', {
+    title: '출제 기준에 맞춰 문제 생성',
+    description: '자료 ID를 지정하면, 출제 기준(난이도 배분/오답 품질/근거 기반 등)을 포함한 전체 지시문을 생성합니다.',
+    argsSchema: {
+      materialId: z.string().describe('문제를 생성할 자료 ID (list_materials 결과의 id 값)'),
+      count: z.string().optional().describe('생성할 문제 개수 (기본값 5)')
+    }
+  }, async ({ materialId, count }) => {
+    const n = count && Number.isFinite(Number(count)) ? Number(count) : 5;
+    const text = [
+      '너는 대학생의 시험 대비를 돕는 문제 출제자야. 아래 절차와 출제 기준을 반드시 지켜서 문제를 만들어줘.',
+      '',
+      '[절차]',
+      `1. get_material_text 도구로 자료 ID "${materialId}"의 내용을 가져온다.`,
+      `2. 아래 출제 기준에 따라 객관식 문제 ${n}개를 만든다.`,
+      `3. submit_questions 도구로 자료 ID "${materialId}"에 제출한다.`,
+      '',
+      '[출제 기준]',
+      '- 모든 문제와 정답은 반드시 가져온 자료 본문에 근거해야 한다. 자료에 없는 내용을 지어내지 않는다.',
+      '- 자료 전체 범위를 균형 있게 다룬다. 앞부분 내용에만 몰리지 않게 한다.',
+      '- 난이도는 쉬운 것부터 어려운 순서로 배치한다:',
+      '  - 앞쪽 1~2개: 핵심 용어/정의를 묻는 쉬운 확인 문제',
+      '  - 중간: 개념 간 관계나 적용을 묻는 문제',
+      '  - 뒤쪽: 종합적 이해나 헷갈리기 쉬운 지점을 짚는 문제',
+      '- 선택지는 4개. 오답 3개는 그럴듯해야 한다(무관한 보기나 말장난 금지). 자료에 등장하는 비슷한 용어/흔히 헷갈리는 개념을 오답으로 활용한다.',
+      '- 질문 문장은 중의적이지 않고 명확하게 쓴다.',
+      '- 해설(explanation)에는 정답인 이유와, 헷갈릴 수 있는 오답이 왜 틀렸는지를 1~2문장으로 포함한다.',
+      '- 단순 암기보다 이해를 확인하는 문제를 우선한다.'
+    ].join('\n');
+    return { messages: [{ role: 'user', content: { type: 'text', text } }] };
+  });
+
   return server;
 }
 
@@ -324,6 +384,42 @@ app.get('/mcp', (req, res) => {
 
 app.delete('/mcp', (req, res) => {
   res.status(405).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed.' }, id: null });
+});
+
+// --- Legacy HTTP+SSE transport: some clients (e.g. ChatGPT custom connectors) require this instead of Streamable HTTP ---
+
+const sseSessions = new Map();
+const SSE_IDLE_MS = 30 * 60000;
+
+setInterval(() => {
+  const cutoff = Date.now() - SSE_IDLE_MS;
+  for (const [sessionId, session] of sseSessions) {
+    if (session.lastActive < cutoff) {
+      session.transport.close().catch(() => {});
+      sseSessions.delete(sessionId);
+    }
+  }
+}, 60000).unref();
+
+app.get('/sse', async (req, res) => {
+  const server = buildMcpServer();
+  const transport = new SSEServerTransport('/messages', res);
+  sseSessions.set(transport.sessionId, { transport, lastActive: Date.now() });
+  transport.onclose = () => {
+    sseSessions.delete(transport.sessionId);
+    server.close();
+  };
+  await server.connect(transport);
+});
+
+app.post('/messages', express.json(), async (req, res) => {
+  const sessionId = req.query.sessionId;
+  const session = sseSessions.get(sessionId);
+  if (!session) {
+    return res.status(400).send('알 수 없는 세션입니다. GET /sse로 먼저 연결하세요.');
+  }
+  session.lastActive = Date.now();
+  await session.transport.handlePostMessage(req, res, req.body);
 });
 
 app.listen(PORT, () => {
