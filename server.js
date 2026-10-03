@@ -10,6 +10,10 @@ const entitlements = require('./entitlements');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// FR-12 교안으로 문제 만들기 API. 고른 쪽의 글자를 받으므로 기본 100KB보다 큰 본문을 허용한다.
+app.use('/api/generate', express.json({ limit: '600kb' }));
+require('./ai-generate')(app);
+
 // 점수 API용 JSON 바디 파서 (업로드 멀티파트와는 별개 경로에만 적용됨)
 app.use(express.json());
 
