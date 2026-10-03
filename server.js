@@ -7,11 +7,57 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { SSEServerTransport } = require('@modelcontextprotocol/sdk/server/sse.js');
 const { PDFParse } = require('pdf-parse');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const MAX_TEXT_CHARS = 100000;
+
+const QUIZ_STYLE_GUIDANCE = {
+  concept: '개념/정의/용어를 정확히 아는지 확인하는 문제를 중심으로 만든다. 계산이나 응용 비중은 낮춘다.',
+  applied: '개념을 실제 상황, 예시, 계산에 적용하는 문제를 중심으로 만든다. 단순 정의를 묻는 문제는 1개 이하로 줄인다.',
+  mixed: '개념 확인 문제와 응용 문제를 절반씩 섞는다.'
+};
+
+function buildQuizCriteriaLines(style) {
+  const key = QUIZ_STYLE_GUIDANCE[style] ? style : 'mixed';
+  return [
+    '- 모든 문제와 정답은 반드시 제공된 자료 본문에 근거해야 한다. 자료에 없는 내용을 지어내지 않는다.',
+    '- 자료 전체 범위를 균형 있게 다룬다. 앞부분 내용에만 몰리지 않게 한다.',
+    `- 문항 스타일: ${QUIZ_STYLE_GUIDANCE[key]}`,
+    '- 난이도는 쉬운 것부터 어려운 순서로 배치한다:',
+    '  - 앞쪽 1~2개: 핵심 용어/정의를 묻는 쉬운 확인 문제',
+    '  - 중간: 개념 간 관계나 적용을 묻는 문제',
+    '  - 뒤쪽: 종합적 이해나 헷갈리기 쉬운 지점을 짚는 문제',
+    '- 선택지는 4개. 오답 3개는 그럴듯해야 한다(무관한 보기나 말장난 금지). 자료에 등장하는 비슷한 용어/흔히 헷갈리는 개념을 오답으로 활용한다.',
+    '- 질문 문장은 중의적이지 않고 명확하게 쓴다.',
+    '- 해설(explanation)에는 정답인 이유와, 헷갈릴 수 있는 오답이 왜 틀렸는지를 1~2문장으로 포함한다.',
+    '- 단순 암기보다 이해를 확인하는 문제를 우선한다.'
+  ];
+}
+
+const QUESTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    questions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' },
+          options: { type: 'array', items: { type: 'string' } },
+          answer_index: { type: 'integer' },
+          explanation: { type: 'string' }
+        },
+        required: ['question', 'options', 'answer_index', 'explanation'],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ['questions'],
+  additionalProperties: false
+};
 
 const uploadDir = path.join(__dirname, 'uploads');
 const metadataFile = path.join(uploadDir, 'metadata.json');
@@ -141,6 +187,11 @@ function pageShell(title, bodyHtml) {
   .share-section .sub { color: #777; font-size: 0.85rem; margin: 0 0 10px; }
   .share-group { margin-top: 12px; }
   .share-group h4 { margin: 0 0 4px; font-size: 0.9rem; color: #333; }
+  .generate-form { flex-direction: row; flex-wrap: wrap; padding: 0; background: none; box-shadow: none; gap: 6px; align-items: center; }
+  .generate-form input[type=password], .generate-form select, .generate-form input[type=number] { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.82rem; }
+  .generate-form input[type=password] { width: 150px; }
+  .generate-form input[type=number] { width: 55px; }
+  .generate-form button { padding: 6px 10px; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -187,6 +238,22 @@ function mcpInstructionsHtml(req) {
 }
 
 function renderFileItem(f) {
+  const actions = f.questions
+    ? `<a href="/questions/${encodeURIComponent(f.storedName)}"><button type="button" class="secondary">생성된 문제 보기</button></a>`
+    : `
+      <form class="generate-form" action="/generate/${encodeURIComponent(f.storedName)}" method="post"
+            onsubmit="localStorage.setItem('passfinder_api_key', this.apiKey.value)">
+        <input type="password" name="apiKey" class="apikey-input" placeholder="Anthropic API 키" autocomplete="off" required>
+        <select name="style">
+          <option value="mixed">혼합</option>
+          <option value="concept">개념확인</option>
+          <option value="applied">응용</option>
+        </select>
+        <input type="number" name="count" min="1" max="20" value="5">
+        <button type="submit" class="secondary">문제 생성</button>
+      </form>
+    `;
+
   return `
     <li class="file-item">
       <div class="file-main">
@@ -195,7 +262,7 @@ function renderFileItem(f) {
         <span class="id-tag">자료 ID: ${escapeHtml(f.storedName)}</span>
       </div>
       <div class="file-actions">
-        ${f.questions ? `<a href="/questions/${encodeURIComponent(f.storedName)}"><button type="button" class="secondary">생성된 문제 보기</button></a>` : '<span class="meta">아직 문제 없음</span>'}
+        ${actions}
       </div>
     </li>
   `;
@@ -258,6 +325,12 @@ function renderPage(fileList, message, req) {
   <h2>업로드된 교안</h2>
   ${renderFileTree(fileList)}
   ${mcpInstructionsHtml(req)}
+  <script>
+    (function() {
+      var saved = localStorage.getItem('passfinder_api_key') || '';
+      document.querySelectorAll('.apikey-input').forEach(function(el) { el.value = saved; });
+    })();
+  </script>
   `;
 
   return pageShell('PassFinder - 교안 업로드', body);
@@ -373,6 +446,73 @@ app.get('/questions/:storedName', (req, res) => {
   res.send(renderQuestionsPage(entry, list));
 });
 
+// --- Server-proxied generation: user supplies their own Anthropic API key per request.
+// The key is never written to disk or logged; it is used only for this one call. ---
+
+app.post('/generate/:storedName', express.urlencoded({ extended: false }), async (req, res) => {
+  const list = readMetadata();
+  const entry = list.find((f) => f.storedName === req.params.storedName);
+  if (!entry) {
+    return res.status(404).send(renderPage(list, { type: 'error', text: '자료를 찾을 수 없습니다.' }, req));
+  }
+
+  const apiKey = (req.body.apiKey || '').trim();
+  if (!apiKey) {
+    return res.status(400).send(renderPage(list, { type: 'error', text: 'Anthropic API 키를 입력해주세요.' }, req));
+  }
+
+  const count = Math.min(Math.max(Number(req.body.count) || 5, 1), 20);
+  const style = req.body.style || 'mixed';
+
+  const txtPath = textFilePath(entry.storedName);
+  if (!fs.existsSync(txtPath)) {
+    return res.status(400).send(renderPage(list, { type: 'error', text: '이 자료는 아직 텍스트 추출이 끝나지 않았습니다. 잠시 후 다시 시도해주세요.' }, req));
+  }
+  let materialText = fs.readFileSync(txtPath, 'utf-8');
+  if (materialText.length > MAX_TEXT_CHARS) {
+    materialText = materialText.slice(0, MAX_TEXT_CHARS) + '\n\n[내용이 길어 일부만 제공됩니다]';
+  }
+
+  const promptText = [
+    `너는 대학생의 시험 대비를 돕는 문제 출제자야. 아래 자료를 바탕으로 객관식 문제 ${count}개를 만들어줘.`,
+    '',
+    '[출제 기준]',
+    ...buildQuizCriteriaLines(style),
+    '',
+    '[자료 본문]',
+    materialText
+  ].join('\n');
+
+  try {
+    const anthropic = new Anthropic({ apiKey });
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 8000,
+      output_config: {
+        effort: 'medium',
+        format: { type: 'json_schema', schema: QUESTION_SCHEMA }
+      },
+      messages: [{ role: 'user', content: promptText }]
+    });
+
+    if (message.stop_reason === 'refusal') {
+      throw new Error('모델이 요청을 거부했습니다. 다른 자료로 다시 시도해주세요.');
+    }
+    const textBlock = message.content.find((b) => b.type === 'text');
+    if (!textBlock) {
+      throw new Error('모델 응답에서 텍스트를 찾을 수 없습니다.');
+    }
+
+    const parsed = JSON.parse(textBlock.text);
+    entry.questions = parsed.questions;
+    writeMetadata(list);
+    res.redirect(`/questions/${encodeURIComponent(entry.storedName)}`);
+  } catch (err) {
+    console.error('문제 생성 오류:', err.message);
+    res.status(500).send(renderPage(list, { type: 'error', text: '문제 생성 중 오류가 발생했습니다: ' + err.message }, req));
+  }
+});
+
 // --- MCP server: exposes uploaded materials to the user's own AI client ---
 
 function buildMcpServer() {
@@ -438,12 +578,6 @@ function buildMcpServer() {
     return { content: [{ type: 'text', text: `${questions.length}개의 문제가 저장되었습니다. 자료 ID: ${id}` }] };
   });
 
-  const STYLE_GUIDANCE = {
-    concept: '개념/정의/용어를 정확히 아는지 확인하는 문제를 중심으로 만든다. 계산이나 응용 비중은 낮춘다.',
-    applied: '개념을 실제 상황, 예시, 계산에 적용하는 문제를 중심으로 만든다. 단순 정의를 묻는 문제는 1개 이하로 줄인다.',
-    mixed: '개념 확인 문제와 응용 문제를 절반씩 섞는다.'
-  };
-
   server.registerPrompt('generate_quiz', {
     title: '출제 기준에 맞춰 문제 생성',
     description: '자료 ID를 지정하면, 출제 기준(난이도 배분/오답 품질/근거 기반 등)을 포함한 전체 지시문을 생성합니다.',
@@ -454,7 +588,6 @@ function buildMcpServer() {
     }
   }, async ({ materialId, count, style }) => {
     const n = count && Number.isFinite(Number(count)) ? Number(count) : 5;
-    const styleKey = style && STYLE_GUIDANCE[style] ? style : 'mixed';
     const text = [
       '너는 대학생의 시험 대비를 돕는 문제 출제자야. 아래 절차와 출제 기준을 반드시 지켜서 문제를 만들어줘.',
       '',
@@ -464,17 +597,7 @@ function buildMcpServer() {
       `3. submit_questions 도구로 자료 ID "${materialId}"에 제출한다.`,
       '',
       '[출제 기준]',
-      '- 모든 문제와 정답은 반드시 가져온 자료 본문에 근거해야 한다. 자료에 없는 내용을 지어내지 않는다.',
-      '- 자료 전체 범위를 균형 있게 다룬다. 앞부분 내용에만 몰리지 않게 한다.',
-      `- 문항 스타일: ${STYLE_GUIDANCE[styleKey]}`,
-      '- 난이도는 쉬운 것부터 어려운 순서로 배치한다:',
-      '  - 앞쪽 1~2개: 핵심 용어/정의를 묻는 쉬운 확인 문제',
-      '  - 중간: 개념 간 관계나 적용을 묻는 문제',
-      '  - 뒤쪽: 종합적 이해나 헷갈리기 쉬운 지점을 짚는 문제',
-      '- 선택지는 4개. 오답 3개는 그럴듯해야 한다(무관한 보기나 말장난 금지). 자료에 등장하는 비슷한 용어/흔히 헷갈리는 개념을 오답으로 활용한다.',
-      '- 질문 문장은 중의적이지 않고 명확하게 쓴다.',
-      '- 해설(explanation)에는 정답인 이유와, 헷갈릴 수 있는 오답이 왜 틀렸는지를 1~2문장으로 포함한다.',
-      '- 단순 암기보다 이해를 확인하는 문제를 우선한다.'
+      ...buildQuizCriteriaLines(style)
     ].join('\n');
     return { messages: [{ role: 'user', content: { type: 'text', text } }] };
   });
