@@ -282,5 +282,5 @@
 - 공개 소스 저장소 URL: https://github.com/Snow0821/AltTab
 - 최종 커밋 ID:
 - 실제 AI 연동 / 데모 여부: 임베딩은 Vercel AI Gateway 실제 호출, 문항 생성·검수는 사용자 AI의 실제 MCP 호출, 결제는 자체 모의 결제(실제 결제 없음)
-- 환경 변수 이름(값 제외): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_URL_NON_POOLING`(스키마 적용용), `AI_GATEWAY_API_KEY`(선택, 없으면 Vercel 배포의 OIDC 토큰 사용)
-- 실행 및 빌드 방법: `npm install` → `vercel env pull .env.local` → `npm run db:apply`(스키마 적용) → `npm run dev` / 배포는 `vercel --prod`
+- 환경 변수 이름(값 제외): 서비스 실행에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(새 키 체계면 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), `SUPABASE_SERVICE_ROLE_KEY`(새 키 체계면 `SUPABASE_SECRET_KEY`). 선택: `NEXT_PUBLIC_DEMO_JOIN_CODE`(첫 화면 체험 과목 참여 코드), `AI_GATEWAY_API_KEY`(없으면 Vercel 배포의 OIDC 토큰), `EMBED_MODEL`(기본 `alibaba/qwen3-embedding-4b`), `MCP_ALLOWED_ORIGINS`. 스키마 적용·점검 스크립트에만 `POSTGRES_URL_NON_POOLING`.
+- 실행 및 빌드 방법: `npm install` → 환경 변수 설정(`vercel env pull .env.local`) → 스키마 적용(`supabase/schema.sql`을 Supabase SQL 편집기에서 실행하거나 `npm run db:apply`) → `npm run dev`. 배포는 팀 Vercel 프로젝트(main 병합 시 자동). 체험 과목은 배포 뒤 `BASE_URL=<배포 주소> node --env-file=.env.local scripts/seed-demo.mjs`로 만든다
