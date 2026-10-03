@@ -66,7 +66,7 @@ const upload = multer({
 
 app.use('/uploads', express.static(uploadDir, { index: false }));
 // Isolated, sample-only exam UI. Existing upload home and data flow remain unchanged.
-app.use('/study', express.static(path.join(__dirname, 'public', 'exam-workspace')));
+app.use('/study', express.static(path.join(__dirname, '..', 'public', 'exam-workspace')));
 
 function renderPage(fileList, message) {
   const items = fileList.map((f) => `

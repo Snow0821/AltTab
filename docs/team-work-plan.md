@@ -162,4 +162,24 @@ E가 결과를 모으되 각 담당자가 자기 기능을 직접 확인합니�
 | 배포 접근 | A/E | 외부 브라우저와 MCP에서 접속, 허용되지 않은 사용자에게 파일·정답·키 노출 없음 | 미확인 |
 | 데모와 제출 | E/팀 지정 제출자 | 실제/모의/미구현 구분, 최종 URL·커밋·사용 도구·제한 기록, 16:00 전 제출 확인 | 미확인 |
 
+## 7 Next.js 기준을 고를 때의 파일 대응 (PR #4 제안)
+
+PR #4는 PRD 8절(Next.js·Supabase·Vercel) 기준 구현이다. 팀이 이 기준을 고르면 A~E 역할은 위와 같고 수정 파일만 아래처럼 바뀐다. `server.js` 한 파일 대신 기능별 파일로 나눠 같은 파일을 두 사람이 고치지 않는다. 기능 추가 중단은 이 문서의 14:40을 따른다.
+
+담당자 이름은 제안이며 확정되지 않았다. GitHub 계정은 chcg305 박재현, Snow0821 최순호, wpalswpa 이제민, yena1717 박예나, 7117wkd 장용선이다(13:50 확인).
+
+팀 결정(13:45): Supabase 생성과 배포용 Vercel 프로젝트 연결은 최순호가 맡는다. 배포 주소가 둘로 갈리지 않도록 팀 주소(alt-tab-mu.vercel.app)의 프로젝트 하나에 Supabase를 붙이는 안을 권한다(미확정). 연결 뒤 `supabase/schema.sql`을 Supabase SQL 편집기에 붙여 실행하거나 `npm run db:apply`로 적용하고, `npm run db:check`로 원자성과 권한을 확인한다.
+
+현재 main의 Express는 팀 주소에서 GET / 부터 500(FUNCTION_INVOCATION_FAILED)이다(13:41 확인). 다른 세션의 배포 로그로는 `server.js`의 업로드 폴더 생성이 Vercel의 읽기 전용 파일시스템(EROFS)에서 실패한다.
+
+| 역할 | 제안 담당 | 수정 파일 | 입출력 계약 | 완료 기준(배포 주소에서 확인) |
+| --- | --- | --- | --- | --- |
+| A 서버·통합 | 이제민(코드), 최순호(Supabase 생성·Vercel 연결) | `package.json`, `vercel.json`, `supabase/schema.sql`, `lib/`(supabase·auth·access·http·validate·rules), 배포 | 설계서 6~8절 | 스키마 적용, 첫 화면·가입·과목·참여 코드 동작 |
+| B 교안 처리 | 최순호 | `components/MaterialsPanel.tsx`, `app/api/courses/[id]/materials/`, `app/api/materials/[id]/index/`, `lib/embed.ts`, `lib/chunk.ts` | 설계서 8절 교안 API | FR-01 업로드·실패 4종·재업로드 안내, 30쪽·200쪽 PDF 분석 시간 측정 |
+| C MCP·문항 검수 | 박재현 | `app/api/mcp/[token]/`, `app/api/mcp-token/`, `lib/mcp/tools.ts`, `lib/review.ts`, `components/McpPanel.tsx` | 설계서 8절 MCP | Claude Desktop·Claude Code에서 도구 7개 호출, 계정 3개로 검증 완료 전환, 체험 과목 문항 만들기 |
+| D 학습 화면 | 박예나 | `components/StageMap.tsx`, `app/courses/[id]/page.tsx`, `app/courses/[id]/play/` | 설계서 8절 퀴즈 API | FR-04·05 문구가 모두 화면에 나옴, 휴대폰 너비에서 가로 스크롤 없음 |
+| E 이용권·QA·데모 | 장용선 | `app/courses/[id]/pay/`, `app/api/payments/`, `lib/entitlement.ts`, `app/api/stages/`, `lib/quiz.ts`, PRD 결과표 | 설계서 8절 결제·퀴즈 API | FR-05 채점·FR-06 결제 경계 확인, PRD "최종 구현 및 검증" 표 기록 |
+
+PR #3(Express MCP)의 기능은 다음처럼 대응한다. `list_materials` → `list_courses`와 `get_course_context`, `get_material_text` → `get_course_context`(cursor로 전체 읽기), `submit_questions` → `submit_questions`(1차 검수 체크리스트와 근거 대조 추가), 서버의 pdf-parse 추출 → 브라우저 unpdf 추출, `/questions/:id` 화면 → 스테이지 플레이. 팀이 Express를 고르면 이 절은 지운다.
+
 이 문서는 역할·경로·연결 순서를 합의하기 위한 제안입니다. 실제 배정, 기능 완성, 배포 또는 제출 완료를 증명하지 않습니다.
