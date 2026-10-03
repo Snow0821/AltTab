@@ -42,14 +42,20 @@ JSON 객체만 반환하세요: {"questions":[{"body":"문제","choices":["보�
       throw Object.assign(new Error('AI가 문제를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'), { status: 502 });
     }
     const data = await response.json();
+    if (data.stop_reason === 'max_tokens') {
+      throw Object.assign(new Error('AI 응답이 길어 도중에 멈췄어요. 교안 범위를 줄여 다시 시도해 주세요.'), { status: 422 });
+    }
     const raw = (data.content || []).filter(p => p.type === 'text').map(p => p.text).join('');
     let list;
     try { list = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)).questions; } catch { list = null; }
     const seen = new Set();
     const pages = new Map(source.pages.map(p => [p.page, squash(p.text)]));
     const questions = Array.isArray(list) ? list.map(q => check(q, pages, seen)) : [];
-    if (questions.length !== 5 || questions.some(q => typeof q === 'string' || q.body.length > 500 || q.choices.some(c => c.length > 250) || q.explanation.length > 800 || q.evidence.quote.length > 500)) {
-      throw Object.assign(new Error('교안 근거를 확인할 수 있는 5문제를 완성하지 못했어요. 다른 범위를 선택해 주세요.'), { status: 422 });
+    const rejected = questions.filter(q => typeof q === 'string');
+    if (!Array.isArray(list)) throw Object.assign(new Error('AI 응답 형식이 올바르지 않아요. 다시 시도해 주세요.'), { status: 422 });
+    if (questions.length !== 5 || rejected.length || questions.some(q => q.body.length > 500 || q.choices.some(c => c.length > 250) || q.explanation.length > 800 || q.evidence.quote.length > 500)) {
+      const reason = [...new Set(rejected)].join(', ') || '문항 수 또는 길이 기준';
+      throw Object.assign(new Error(`문제 검사를 통과하지 못했어요(${reason}). 교안 범위를 바꿔 다시 시도해 주세요.`), { status: 422 });
     }
     return questions.map((q, i) => ({ id: `q${i + 1}`, ...q }));
   } catch (error) {
