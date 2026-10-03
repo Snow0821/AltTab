@@ -10,6 +10,9 @@ const entitlements = require('./entitlements');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Isolated, bounded DB/LLM demo. Secrets stay in this server module.
+require('./connection-check')(app);
+
 // FR-12 교안으로 문제 만들기 API. 고른 쪽의 글자를 받으므로 기본 100KB보다 큰 본문을 허용한다.
 app.use('/api/generate', express.json({ limit: '600kb' }));
 require('./ai-generate')(app);

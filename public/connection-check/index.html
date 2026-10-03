@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AltTab · 연결 테스트</title>
+  <link rel="stylesheet" href="/mock/styles.css">
+  <script src="/mock/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <nav><a href="/study/">← AltTab으로</a><span>MOCK / CONNECTION CHECK</span></nav>
+    <header><p class="eyebrow">작게 입력하고, 실제로 확인하기</p><h1>연결 테스트</h1><p>DB에 저장한 값을 다시 읽고, 학교 AI의 짧은 답변을 확인해요.</p></header>
+    <aside class="notice"><strong>공개 시연용 테스트 화면</strong><p>실제 Supabase와 학교 AI를 사용해요. 개인정보·비밀번호·API 키는 입력하지 마세요. DB는 테스트 문장 1개만 보관하고 다음 저장 때 바뀌어요.</p><p>AI는 전체 방문자를 합쳐 1회만 호출해요. 200자 입력 · 최대 32 출력 토큰 · 자동 재시도 없음. 학교의 실제 과금 단가는 별도 확인이 필요해요.</p><p>실행 가능 시간: 2026년 10월 3일 20:00 KST까지</p></aside>
+    <div id="configuration" class="configuration" role="status">서버 설정 확인 중…</div>
+    <section aria-labelledby="db-heading">
+      <div class="section-heading"><span class="number">01</span><div><h2 id="db-heading">DB 저장 → 읽기</h2><p>입력한 문장이 실제 DB에서 똑같이 돌아오는지 확인해요</p></div><span id="db-badge" class="badge">미검증</span></div>
+      <form id="db-form">
+        <label for="db-value">테스트 값</label>
+        <input id="db-value" name="value" maxlength="200" required value="안녕 AltTab! DB 연결 테스트" autocomplete="off">
+        <button id="db-submit" type="submit" disabled>저장하고 읽어오기</button>
+      </form>
+      <div id="db-result" class="result" aria-live="polite">아직 실제 저장·읽기를 실행하지 않았어요</div>
+    </section>
+    <section aria-labelledby="llm-heading">
+      <div class="section-heading"><span class="number">02</span><div><h2 id="llm-heading">LLM 입력 → 출력</h2><p>DB 확인 후, 학교 AI와 한 번 대화해요</p></div><span id="llm-badge" class="badge">미검증</span></div>
+      <form id="llm-form">
+        <label for="llm-input">AI에게 보낼 짧은 문장</label>
+        <textarea id="llm-input" name="message" rows="3" maxlength="200" required>안녕! 한 문장으로 인사해 줘.</textarea>
+        <button id="llm-submit" type="submit" disabled>AI에 1회 보내기</button>
+      </form>
+      <div id="llm-result" class="result" aria-live="polite">먼저 DB 저장·읽기를 완료해 주세요</div>
+    </section>
+    <footer>서버 전용 키는 브라우저에 전달하지 않아요 · 샘플 응답을 성공으로 표시하지 않아요</footer>
+  </main>
+</body>
+</html>
