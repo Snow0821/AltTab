@@ -42,10 +42,15 @@ const UNIT_SIZE = 5; // 한 스테이지(유닛)당 5문제
 const PASS_THRESHOLD = 4; // 5문제 중 4개 이상 정답이면 클리어
 const POINTS_PER_QUESTION = 10;
 
-// 스테이지별 문항 구성. ★1은 난이도 1~2 중심 5문제.
+// 스테이지별 문항 구성. UNIT_SIZE(5)개마다 유닛 하나.
+// 유닛1 = stage-1~5(무료), stage-6부터 유닛2(이용권 필요).
 const STAGES = {
   'stage-1': ['demo-q1', 'demo-q2', 'demo-q3', 'demo-q4', 'demo-q5'],
-  'stage-2': ['demo-q4', 'demo-q5', 'demo-q6', 'demo-q7', 'demo-q8']
+  'stage-2': ['demo-q4', 'demo-q5', 'demo-q6', 'demo-q7', 'demo-q8'],
+  'stage-3': ['demo-q1', 'demo-q3', 'demo-q5', 'demo-q7', 'demo-q2'],
+  'stage-4': ['demo-q2', 'demo-q4', 'demo-q6', 'demo-q8', 'demo-q1'],
+  'stage-5': ['demo-q3', 'demo-q5', 'demo-q7', 'demo-q1', 'demo-q4'],
+  'stage-6': ['demo-q5', 'demo-q6', 'demo-q7', 'demo-q8', 'demo-q2']
 };
 
 function getBankQuestion(id) {
@@ -227,10 +232,24 @@ function listStages() {
   return Object.keys(STAGES);
 }
 
+// 스테이지의 1-based 순번(등록 순). 없으면 null.
+function stageOrder(stageId) {
+  const idx = Object.keys(STAGES).indexOf(stageId);
+  return idx === -1 ? null : idx + 1;
+}
+
+// 스테이지가 속한 유닛 번호(1-based). UNIT_SIZE개마다 한 유닛.
+function stageUnit(stageId) {
+  const order = stageOrder(stageId);
+  return order === null ? null : Math.ceil(order / UNIT_SIZE);
+}
+
 module.exports = {
   createAttempt,
   gradeAttempt,
   listStages,
+  stageOrder,
+  stageUnit,
   starsFor,
   COURSE,
   UNIT_SIZE,

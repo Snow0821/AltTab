@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const scores = require('./scores');
 const exam = require('./exam');
+const entitlements = require('./entitlements');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -210,14 +211,61 @@ app.get('/api/leaderboard/stream', async (req, res) => {
   });
 });
 
+// ===== 이용권 (FR-06) =====
+// 과목 접근 판정: GET /api/courses/:courseId/access?userId=&stageUnit=
+app.get('/api/courses/:courseId/access', (req, res) => {
+  try {
+    const userId = req.query.userId || 'anonymous';
+    const stageUnit = req.query.stageUnit !== undefined ? Number(req.query.stageUnit) : undefined;
+    const access = entitlements.getAccess(req.params.courseId, userId, { stageUnit });
+    res.json({ ok: true, ...access });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
+// 테스트(모의) 결제: POST /api/courses/:courseId/entitlements  { userId?, plan, simulateFailure? }
+app.post('/api/courses/:courseId/entitlements', (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = entitlements.purchase(req.params.courseId, body.userId || 'anonymous', body.plan, {
+      simulateFailure: !!body.simulateFailure
+    });
+    res.status(201).json({ ok: true, ...result });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
 // ===== 시험 출제 / 서버 채점 =====
 // 정답/해설은 서버에만 둔다. 출제 응답에는 정답을 포함하지 않고, 채점은 서버에서만 한다.
 
-// 스테이지 출제: POST /api/stages/:stageId/attempts  { userId? }
+// 스테이지 출제: POST /api/stages/:stageId/attempts  { userId?, courseId? }
 app.post('/api/stages/:stageId/attempts', (req, res) => {
   try {
-    const userId = (req.body && req.body.userId) || 'anonymous';
-    const attempt = exam.createAttempt(req.params.stageId, userId);
+    const body = req.body || {};
+    const userId = body.userId || 'anonymous';
+    const stageId = req.params.stageId;
+
+    // 이용권 접근 제한: 무료 유닛을 넘는 스테이지는 이용권이 있어야 출제된다.
+    const unit = exam.stageUnit(stageId);
+    if (unit === null) {
+      return res.status(404).json({ ok: false, error: `존재하지 않는 스테이지입니다: ${stageId}` });
+    }
+    const courseId = body.courseId || exam.COURSE.id;
+    const access = entitlements.getAccess(courseId, userId, { stageUnit: unit });
+    if (!access.canPlay) {
+      return res.status(403).json({
+        ok: false,
+        error: '이용권이 필요합니다. 결제 후 이용할 수 있어요.',
+        code: 'payment_required',
+        access
+      });
+    }
+
+    const attempt = exam.createAttempt(stageId, userId);
     res.status(201).json({ ok: true, ...attempt });
   } catch (err) {
     const status = err.statusCode || 500;
