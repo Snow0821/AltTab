@@ -4,8 +4,9 @@ import { db } from "@/lib/supabase-admin";
 import { handle, ok, readJson, HttpError } from "@/lib/http";
 import { str, InvalidInput } from "@/lib/validate";
 
-// 확인 메일을 생략하는 대신 같은 접속 주소(IP)에서 한 시간에 10번까지만 가입을 시도할 수 있다.
-const SIGNUP_LIMIT_PER_HOUR = 10;
+// 확인 메일을 생략하는 대신 같은 접속 주소(IP)에서 한 시간에 60번까지만 가입을 시도할 수 있다.
+// 대회장·강의실처럼 여러 사람이 한 주소를 쓰는 경우를 막지 않으면서 대량 자동 가입만 막는 값이다.
+const SIGNUP_LIMIT_PER_HOUR = 60;
 
 function clientIp(req: Request) {
   return (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
