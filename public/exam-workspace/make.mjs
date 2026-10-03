@@ -144,16 +144,6 @@ function sourceBadge(set) {
     : `<span class="badge">학교 AI 생성 · ${esc(set.model)} · ${esc(timeText(set.generatedAt))}</span>`;
 }
 
-function savedList() {
-  const sets = load(KEYS.sets, {});
-  const keys = Object.keys(sets);
-  if (!keys.length) return '';
-  return `<section class="card saved"><h2>저장된 문제 묶음</h2><ul>${keys.map((k) => {
-    const s = sets[k]; const a = lastAttempt(k);
-    return `<li><button class="ghost" data-open="${esc(k)}">${esc(s.title)} ${s.range ? `${s.range.from}~${s.range.to}쪽` : ''}</button> ${sourceBadge(s)} ${a ? `· 최근 ${a.correct}/${a.total}` : '· 아직 안 풂'}</li>`;
-  }).join('')}</ul></section>`;
-}
-
 function render() {
   const s = state;
   const err = s.error ? `<p class="msg error" role="alert">${esc(s.error)}</p>` : '';
@@ -175,14 +165,13 @@ function render() {
       ${s.error && s.status === 'ready' ? '<button class="ghost" id="retry">다시 시도</button>' : ''}</p>
       ${err}
     </section>` : err}
-    ${savedList()}`;
+    `;
   app.querySelector('#file')?.addEventListener('change', (e) => onFile(e.target.files[0]));
   app.querySelector('#sample')?.addEventListener('click', () => openSet('sample', SAMPLE));
   app.querySelector('#from')?.addEventListener('change', (e) => { s.from = Number(e.target.value); s.error = null; render(); });
   app.querySelector('#to')?.addEventListener('change', (e) => { s.to = Number(e.target.value); s.error = null; render(); });
   app.querySelector('#gen')?.addEventListener('click', generate);
   app.querySelector('#retry')?.addEventListener('click', generate);
-  app.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openSet(b.dataset.open, load(KEYS.sets, {})[b.dataset.open])));
 }
 
 function renderQuiz(err) {
