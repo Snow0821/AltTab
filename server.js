@@ -2,14 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const uploadDir = path.join(__dirname, 'uploads');
+// Vercel 서버는 코드 폴더가 읽기 전용(EROFS)이라 쓸 수 있는 임시 폴더(/tmp)에 저장한다.
+// 임시 폴더는 서버 인스턴스가 바뀌면 비워지므로 Vercel에서는 업로드가 오래 남지 않는다.
+const dataRoot = process.env.VERCEL ? os.tmpdir() : __dirname;
+const uploadDir = path.join(dataRoot, 'uploads');
 const metadataFile = path.join(uploadDir, 'metadata.json');
 
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 if (!fs.existsSync(metadataFile)) fs.writeFileSync(metadataFile, '[]');
 
 function readMetadata() {
