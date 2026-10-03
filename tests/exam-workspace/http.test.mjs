@@ -10,18 +10,22 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 test('study assets serve correctly and existing PDF upload flow is preserved', async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'alttab-ui-test-'));
   const port = process.env.UI_TEST_PORT || '3493';
-  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: port, VERCEL: '1', TMPDIR: temp }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: port, VERCEL: '1', TMPDIR: temp, TEMP: temp, TMP: temp, SUPABASE_URL: '', NEXT_PUBLIC_SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (data) => { output += data; });
   child.stderr.on('data', (data) => { output += data; });
   try {
-    for (let i = 0; i < 100 && !output.includes('server running'); i++) {
+    const startDeadline = Date.now() + 10000;
+    while (Date.now() < startDeadline && !output.includes('server running')) {
       if (child.exitCode !== null) throw new Error(output);
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.match(output, /server running/);
     const origin = `http://127.0.0.1:${port}`;
-    const home = await fetch(origin); assert.equal(home.status, 200); assert.match(await home.text(), /교안 PDF 업로드/);
+    const home = await fetch(origin); assert.equal(home.status, 200);
+    const homeText = await home.text(); assert.match(homeText, /교안 PDF 업로드/);
+    assert.match(homeText, /href="\/study\/make\.html"/);
+    const makePage = await fetch(`${origin}/study/make.html`); assert.equal(makePage.status, 200); assert.match(await makePage.text(), /교안으로 문제 만들기/);
     const redirect = await fetch(`${origin}/study`, { redirect: 'manual' }); assert.equal(redirect.status, 301); assert.equal(redirect.headers.get('location'), '/study/');
     const page = await fetch(`${origin}/study/`); assert.equal(page.status, 200); assert.match(await page.text(), /샘플 데이터로 체험/);
     for (const asset of ['styles.css', 'app.mjs', 'domain.mjs', 'demo-data.mjs']) {

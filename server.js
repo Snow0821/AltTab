@@ -106,6 +106,8 @@ function renderPage(fileList, message) {
 </head>
 <body>
   <h1>교안 PDF 업로드</h1>
+  <p><a href="/study/make.html">교안으로 AI 문제 5개 만들고 공부하기 →</a></p>
+  <p>개인 AI 계정 없이 이용할 수 있어요. 문제와 풀이 기록은 이 브라우저에 저장돼요.</p>
   <form action="/upload" method="post" enctype="multipart/form-data">
     <input type="file" name="pdf" accept="application/pdf" required>
     <button type="submit">업로드</button>
