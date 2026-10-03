@@ -7,7 +7,7 @@ import * as fixtures from '../../public/exam-workspace/demo-data.mjs';
 const { JSDOM } = await import(process.env.JSDOM_MODULE || 'jsdom');
 const html = fs.readFileSync(new URL('../../public/exam-workspace/index.html', import.meta.url), 'utf8');
 const source = fs.readFileSync(new URL('../../public/exam-workspace/app.mjs', import.meta.url), 'utf8')
-  .replace(/^import .*;\n/gm, '')
+  .replace(/^import .*;\r?\n/gm, '')
   .replace(/^/, 'const { DEMO_COURSE, DEMO_QUESTIONS: questions } = globalThis.__fixtures;\nconst { filterQuestions, selectedQuestions, gradeDemo, insufficientRanking, rankingView, escapeHtml: esc } = globalThis.__helpers;\n');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 12));
 function setup(hash = '') {

@@ -21,13 +21,19 @@ const SAMPLE = {
 
 let app;
 let initialized = false;
-const state = { material: null, from: 1, to: 1, status: 'idle', error: null, setKey: null, set: null, mode: 'all', answers: {}, result: null };
+const state = { material: null, from: 1, to: 1, status: 'idle', error: null, setKey: null, set: null, mode: 'all', answers: {}, result: null, resultSaved: false };
 const inflight = new Map();
 
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const timeText = (iso) => { try { return new Date(iso).toLocaleString('ko-KR'); } catch { return iso; } };
+
+function saveLast(showResult = false) {
+  const saved = save(KEYS.last, { key: state.setKey, mode: state.mode, playIds: state.playIds, answers: state.answers, showResult });
+  if (!saved) state.error = '답안을 이 브라우저에 저장하지 못했어요. 새로고침하면 선택한 답이 사라질 수 있어요.';
+  return saved;
+}
 
 async function sha(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -109,9 +115,9 @@ async function generate() {
 }
 
 function openSet(key, set, mode = 'all') {
-  state.playIds = mode === 'review' ? (lastAttempt(key)?.wrongIds || []) : null;
+  state.playIds = mode === 'review' ? ((state.setKey === key && state.result ? state.result : lastAttempt(key))?.wrongIds || []) : null;
   state.setKey = key; state.set = set; state.mode = mode; state.answers = {}; state.result = null; state.status = 'solving'; state.error = null;
-  save(KEYS.last, { key, mode, playIds: state.playIds });
+  saveLast();
   render();
 }
 
@@ -130,9 +136,12 @@ function submit() {
   if (qs.some((q) => state.answers[q.id] === undefined)) return;
   const details = qs.map((q) => ({ id: q.id, picked: state.answers[q.id], correct: state.answers[q.id] === q.answerIndex }));
   const result = { key: state.setKey, kind: state.mode, at: new Date().toISOString(), total: qs.length, correct: details.filter((d) => d.correct).length, details, wrongIds: details.filter((d) => !d.correct).map((d) => d.id) };
-  const attempts = load(KEYS.attempts, []); attempts.push(result); save(KEYS.attempts, attempts);
+  const attempts = load(KEYS.attempts, []); attempts.push(result);
+  const saved = save(KEYS.attempts, attempts);
   state.result = result; state.status = 'result';
-  save(KEYS.last, { key: state.setKey, mode: state.mode, playIds: state.playIds, showResult: true });
+  const lastSaved = saveLast(saved);
+  state.resultSaved = saved && lastSaved;
+  state.error = state.resultSaved ? null : '풀이 결과를 이 브라우저에 저장하지 못했어요. 현재 결과를 확인하고, 브라우저 저장 설정이나 여유 공간을 확인해 주세요.';
   render();
 }
 
@@ -190,7 +199,7 @@ function renderQuiz(err) {
   app.innerHTML = `
     <section class="card">
       <div class="row"><strong>${esc(s.set.title)} ${s.set.range ? `${s.set.range.from}~${s.set.range.to}쪽` : ''}</strong>${sourceBadge(s.set)}${s.mode === 'review' ? '<span class="badge">오답 복습</span>' : ''}</div>
-      ${done ? `<p class="score">${s.result.correct} / ${s.result.total} 정답</p><p>${timeText(s.result.at)} 저장됨 · 새로고침해도 남아요</p>` : `<p>${answered} / ${qs.length}문항 답함</p>`}
+      ${done ? `<p class="score">${s.result.correct} / ${s.result.total} 정답</p><p>${timeText(s.result.at)} ${s.resultSaved ? '저장됨 · 새로고침해도 남아요' : '저장되지 않음 · 현재 화면에서 결과를 확인해 주세요'}</p>` : `<p>${answered} / ${qs.length}문항 답함</p>`}
     </section>
     <section class="card">${qs.map((q, i) => {
       const d = detail(q);
@@ -203,7 +212,9 @@ function renderQuiz(err) {
     <p class="row">${done
       ? `${s.result.wrongIds.length ? '<button id="review">오답 복습</button>' : '<span class="msg">모두 맞혔어요!</span>'}<button class="ghost" id="again">처음부터 다시 풀기</button><button class="ghost" id="home">다른 자료·범위</button>`
       : `<button id="submit" ${answered < qs.length ? 'disabled' : ''}>제출하고 채점하기</button><button class="ghost" id="home">다른 자료·범위</button>`}</p>`;
-  app.querySelectorAll('input[type=radio]').forEach((r) => r.addEventListener('change', () => { s.answers[r.name] = Number(r.value); renderQuiz(''); }));
+  app.querySelectorAll('input[type=radio]').forEach((r) => r.addEventListener('change', () => {
+    s.answers[r.name] = Number(r.value); s.error = null; saveLast(); render();
+  }));
   app.querySelector('#submit')?.addEventListener('click', submit);
   app.querySelector('#review')?.addEventListener('click', () => openSet(s.setKey, s.set, 'review'));
   app.querySelector('#again')?.addEventListener('click', () => openSet(s.setKey, s.set, 'all'));
@@ -217,7 +228,14 @@ function restore() {
   if (set) {
     state.setKey = last.key; state.set = set; state.mode = last.mode || 'all'; state.playIds = last.playIds || null;
     const a = last.showResult && lastAttempt(last.key);
-    if (a && a.kind === state.mode) { state.result = a; state.status = 'result'; } else state.status = 'solving';
+    if (a && a.kind === state.mode) { state.result = a; state.resultSaved = true; state.status = 'result'; }
+    else {
+      state.status = 'solving';
+      for (const q of questionsInPlay()) {
+        const answer = last.answers?.[q.id];
+        if (Number.isInteger(answer) && answer >= 0 && answer < q.choices.length) state.answers[q.id] = answer;
+      }
+    }
   }
   render();
 }
