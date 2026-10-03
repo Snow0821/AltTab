@@ -2,7 +2,9 @@
 // 글자는 브라우저에서 뽑고, 고른 쪽의 글자만 /api/generate로 보낸다. 결과와 풀이 기록은 이 브라우저(localStorage)에 남긴다.
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
 const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+const courseScope = new URL(import.meta.url).searchParams.get('course');
 const KEYS = { materials: 'pf.make.materials', sets: 'pf.make.sets', attempts: 'pf.make.attempts', last: 'pf.make.last' };
+if (courseScope) Object.keys(KEYS).forEach(key => KEYS[key] += '.' + courseScope);
 const MAX_RANGE = 20;
 
 const SAMPLE = {
@@ -17,7 +19,8 @@ const SAMPLE = {
   ],
 };
 
-const app = document.getElementById('app');
+let app;
+let initialized = false;
 const state = { material: null, from: 1, to: 1, status: 'idle', error: null, setKey: null, set: null, mode: 'all', answers: {}, result: null };
 const inflight = new Map();
 
@@ -208,7 +211,7 @@ function renderQuiz(err) {
 }
 
 // 새로고침 뒤 마지막으로 보던 문제·결과를 되살린다.
-(function restore() {
+function restore() {
   const last = load(KEYS.last, null);
   const set = last && (last.key === 'sample' ? SAMPLE : load(KEYS.sets, {})[last.key]);
   if (set) {
@@ -217,4 +220,11 @@ function renderQuiz(err) {
     if (a && a.kind === state.mode) { state.result = a; state.status = 'result'; } else state.status = 'solving';
   }
   render();
-})();
+}
+
+export function mount(target) {
+  app = target;
+  if (!initialized) { initialized = true; restore(); } else render();
+}
+
+if (!courseScope) mount(document.getElementById('app'));
