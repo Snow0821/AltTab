@@ -17,6 +17,12 @@ header{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:white;bor
 /* Compact course cards share one action style across every subject. */
 .course{min-height:146px;padding:20px;gap:20px;justify-content:space-between}.course-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.course-heading h2{font-size:20px;line-height:1.45;margin:3px 0 0;overflow-wrap:anywhere;min-width:0}.favorite{padding:0;width:34px;height:34px;flex-shrink:0;border:0;background:transparent;color:#91a299;font-size:26px;line-height:1;border-radius:7px}.favorite:hover{background:#e7f4ee}.favorite.is-favorite{color:#bd8d2c}.course-open{font-size:14px;padding:10px 16px;min-height:42px}.new-course-card{min-height:146px;padding:18px;gap:6px;justify-content:center}.new-course-card .add-icon{font-size:28px;line-height:1.1}.new-course-card h2{font-size:17px;margin:0}
 @media(max-width:700px){.course{min-height:140px;padding:18px}.course-heading h2{font-size:19px}.new-course-card{min-height:120px}}
+
+/* Small square subject tiles with restrained typography and a single green action. */
+.course-grid{grid-template-columns:repeat(auto-fill,220px);gap:18px;justify-content:start}.course-grid .course{aspect-ratio:1;width:220px;height:220px;min-height:0;padding:22px;border-radius:18px;gap:18px;box-shadow:0 3px 16px #172e3204;transition:border-color .18s,box-shadow .18s}.course-grid article.course:hover{border-color:#aecfc1;box-shadow:0 8px 24px #172e3209}.course-heading{flex-direction:column-reverse;align-items:stretch;gap:15px}.course-heading h2{font-size:20px;line-height:1.45;font-weight:700;letter-spacing:-.6px;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.favorite{align-self:flex-end;width:30px;height:30px;font-size:25px;background:#f5f8f6}.course-grid .course-open{width:100%;font-size:14px;border-radius:10px;padding:10px 12px;min-height:42px;margin-top:auto}.course-grid .new-course-card{border:1px dashed #b8d0c6;background:#edf5f0;justify-content:center;gap:12px;box-shadow:none}.course-grid .new-course-card .add-icon{height:42px;width:42px;border-radius:13px;background:white;display:grid;place-items:center;font-size:27px}.course-grid .new-course-card h2{font-size:16px;font-weight:600;color:#457365}
+.login-view>header{display:none}.login-view .workspace{margin:0}.login-view .topbar,.login-view .demo-banner,.login-view footer{display:none}.login-view main{max-width:none;padding:0;min-height:100dvh}.login-shell{display:grid;grid-template-columns:minmax(0,1fr) minmax(440px,1fr);min-height:100dvh;background:#fff}.login-story{padding:48px 56px;background:#e9f2ed;display:flex;flex-direction:column;justify-content:space-between;min-height:100dvh}.login-brand{display:flex;align-items:center;gap:10px;font-size:25px;font-weight:800;letter-spacing:-1px}.login-brand>span:last-child{color:var(--blue);margin-left:-8px}.login-message{padding:60px 0}.login-tag{font-size:11px;letter-spacing:2px;color:#578070;font-weight:750}.login-message h1{font-size:clamp(36px,3.6vw,54px);font-weight:750;letter-spacing:-2px;line-height:1.4;margin:24px 0;color:#173d32}.login-message p{font-size:17px;color:#638174;line-height:1.9}.story-steps{display:flex;gap:20px;flex-wrap:wrap;margin-top:44px;padding-top:22px;border-top:1px solid #cee0d5;color:#567a6a;font-size:13px}.story-foot{font-size:12px;color:#729282}.login-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 40px;position:relative}.login-form-wrap{width:100%;max-width:370px}.login-form-wrap h2{font-size:30px;font-weight:750;letter-spacing:-1px;margin:12px 0}.login-subtitle{color:#81928a;font-size:14px;margin:0 0 34px}.login-form-wrap label{font-size:13px;font-weight:650;margin-top:20px;color:#3d594d}.login-form-wrap input{width:100%;height:52px;border:1px solid #dfe8e2;border-radius:10px;background:#fafcfb;padding:14px 16px;margin:9px 0 0;font-size:14px}.login-form-wrap input:focus{background:white}.password-field{position:relative}.password-field input{padding-right:65px}.password-toggle{position:absolute;right:8px;top:17px;border:0;background:none;padding:7px 9px;font-size:12px;color:#6e887a}.login-submit{margin-top:28px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:15px}.login-divider{display:flex;align-items:center;gap:16px;color:#99a79f;font-size:12px;margin:26px 0 18px}.login-divider:before,.login-divider:after{content:'';flex:1;height:1px;background:#e7ede9}.preview-button{font-size:14px;height:48px;background:white;border-color:#dfe8e2;color:#587969;font-weight:550}.login-note{font-size:11px;color:#98a79e;text-align:center;line-height:1.8;margin-top:22px}.login-copyright{font-size:10px;color:#a6b2ab;position:absolute;bottom:22px}.logout{font-size:12px!important;margin-top:16px;color:#8a9c92!important}
+@media(max-width:850px){.login-shell{grid-template-columns:1fr}.login-story{display:none}.login-panel{min-height:100dvh;padding:48px 24px}.login-form-wrap:before{content:'PassFinder.';display:block;color:var(--blue);font-size:25px;font-weight:800;letter-spacing:-1px;margin-bottom:42px}}
+@media(max-width:700px){.course-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.course-grid .course{width:100%;height:auto;aspect-ratio:1;min-height:165px;padding:16px;border-radius:15px;gap:12px}.course-heading{gap:9px}.course-heading h2{font-size:17px;line-height:1.35}.course-grid .course-open{font-size:12px;padding:8px;min-height:36px}.favorite{height:25px;width:25px;font-size:23px}.course-grid .new-course-card h2{font-size:14px}}
 </style>
 </head>
 <body>
@@ -30,6 +36,7 @@ header{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:white;bor
     <button data-page="review">↻ &nbsp; 복습</button>
     <button data-page="ranking">↗ &nbsp; 랭킹</button>
     <button data-page="payment">◇ &nbsp; 이용권</button>
+    <button onclick="go('login')" class="logout">로그아웃</button>
   </nav>
   <div class="sidebar-note"><b style="color:var(--blue)">✦</b><b>작게 풀고, 확실하게 알기</b><p>교안을 정리하고 한 단계씩 학습하며<br>나의 이해도를 확인하세요.</p></div>
   <div class="profile"><div class="avatar">체</div><div>체험 워크스페이스<small>학습맵 · 샘플 데이터</small></div></div>
@@ -51,7 +58,7 @@ header{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:white;bor
 <script>
 const $ = s => document.querySelector(s);
 
-let page = 'home';
+let page = 'login';
 let course = '운영체제';
 const COURSE_KEY = 'pf.courses.v1';
 const initialCourses = [{id:'os',name:'운영체제 중간고사',demo:true},{id:'ds',name:'자료구조',demo:true},{id:'net',name:'컴퓨터네트워크',demo:false}];
@@ -193,7 +200,25 @@ function go(p) {
 function render() {
   let html = '';
 
-  if (page === 'home') {
+  if (page === 'login') {
+    html = `<section class="login-shell" aria-labelledby="login-title">
+      <div class="login-story"><div class="login-brand"><span class="brand-mark">P↗</span>PassFinder<span>.</span></div>
+        <div class="login-message"><span class="login-tag">YOUR NEXT STEP</span><h1>시험 준비의 시작,<br>조금 더 가볍게.</h1><p>교안을 연결하고, 문제를 풀고,<br>하나씩 내 것으로 만드는 공부.</p><div class="story-steps"><span>01 교안 연결</span><span>02 문제 풀이</span><span>03 나의 성장</span></div></div>
+        <span class="story-foot">작게 풀고, 확실하게 알기.</span>
+      </div>
+      <div class="login-panel"><div class="login-form-wrap"><span class="eyebrow">WELCOME BACK</span><h2 id="login-title">다시 만나 반가워요.</h2><p class="login-subtitle">로그인하고 오늘의 학습을 시작하세요.</p>
+        <form id="login-form" onsubmit="previewLogin(event)">
+          <label for="login-id">아이디</label><input id="login-id" type="text" placeholder="아이디를 입력하세요" autocomplete="off" maxlength="80" required>
+          <label for="login-password">비밀번호</label><div class="password-field"><input id="login-password" type="password" placeholder="비밀번호를 입력하세요" autocomplete="off" required><button type="button" class="password-toggle" onclick="togglePassword(this)" aria-label="비밀번호 표시" aria-pressed="false">보기</button></div>
+          <button class="primary wide login-submit" type="submit">로그인 <span>→</span></button>
+        </form>
+        <div class="login-divider"><span>처음 오셨나요?</span></div><button class="preview-button wide" onclick="go('home')">입력 없이 먼저 둘러보기 →</button>
+        <p class="login-note">현재는 화면 체험용 로그인입니다.<br>입력한 아이디와 비밀번호는 전송하거나 저장하지 않아요.</p>
+      </div><p class="login-copyright">© PassFinder. One step at a time.</p></div>
+    </section>`;
+  }
+
+  else if (page === 'home') {
     html = `
       <div class="row between">
         <div>
@@ -205,7 +230,7 @@ function render() {
         </button>
       </div>
 
-      <div class="grid three">
+      <div class="grid course-grid">
         ${courses.map((c,i) => `
           <article class="card course" data-course-id="${escapeHTML(c.id)}">
             <div class="course-heading"><h2>${escapeHTML(c.name)}</h2><button class="favorite ${c.favorite ? 'is-favorite' : ''}" onclick="toggleFavorite(${i})" aria-label="${escapeHTML(c.name)} 즐겨찾기" aria-pressed="${!!c.favorite}" title="즐겨찾기">${c.favorite ? '★' : '☆'}</button></div>
@@ -499,7 +524,8 @@ function render() {
     html = `<div class="content">${paymentHTML()}</div>`;
   }
 
-  const labels = {home:'내 과목',map:'학습맵',materials:'교안 · AI 연결',review:'복습',payment:'이용권',course:'과목 홈',ranking:'랭킹',quiz:'문제 풀이',result:'학습 결과'};
+  document.body.classList.toggle('login-view', page === 'login');
+  const labels = {login:'로그인',home:'내 과목',map:'학습맵',materials:'교안 · AI 연결',review:'복습',payment:'이용권',course:'과목 홈',ranking:'랭킹',quiz:'문제 풀이',result:'학습 결과'};
   $('#page-crumb').textContent = labels[page] || '내 과목';
   document.title = 'PassFinder · ' + (labels[page] || '내 과목');
   document.querySelectorAll('header [data-page]').forEach(b => {
@@ -566,6 +592,24 @@ function pay() {
   paid = true;
   render();
   toast('테스트 결제 완료! 데모 이용권이 활성화됐어요.');
+}
+
+function previewLogin(event) {
+  event.preventDefault();
+  if (!$('#login-form').reportValidity()) return;
+  $('#login-password').value = '';
+  $('#login-id').value = '';
+  go('home');
+  toast('체험 화면입니다. 실제 계정 인증은 아직 연결 전이에요.');
+}
+
+function togglePassword(button) {
+  const input = $('#login-password');
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  button.textContent = show ? '숨기기' : '보기';
+  button.setAttribute('aria-pressed', String(show));
+  button.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 표시');
 }
 
 function toggleFavorite(i) {
