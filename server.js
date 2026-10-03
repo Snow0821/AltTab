@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const scores = require('./scores');
+const exam = require('./exam');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -207,6 +208,33 @@ app.get('/api/leaderboard/stream', async (req, res) => {
     clearInterval(ping);
     rankingClients.delete(res);
   });
+});
+
+// ===== 시험 출제 / 서버 채점 =====
+// 정답/해설은 서버에만 둔다. 출제 응답에는 정답을 포함하지 않고, 채점은 서버에서만 한다.
+
+// 스테이지 출제: POST /api/stages/:stageId/attempts  { userId? }
+app.post('/api/stages/:stageId/attempts', (req, res) => {
+  try {
+    const userId = (req.body && req.body.userId) || 'anonymous';
+    const attempt = exam.createAttempt(req.params.stageId, userId);
+    res.status(201).json({ ok: true, ...attempt });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
+// 답안 제출/채점: POST /api/attempts/:attemptId/answers  { answers: { [questionId]: choiceIndex } }
+app.post('/api/attempts/:attemptId/answers', (req, res) => {
+  try {
+    const answers = (req.body && req.body.answers) || {};
+    const result = exam.gradeAttempt(req.params.attemptId, answers);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
 });
 
 app.listen(PORT, () => {
