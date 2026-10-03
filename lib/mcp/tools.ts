@@ -18,8 +18,8 @@ export type Tool = {
   run: (userId: string, args: Args, req: Request) => Promise<unknown>;
 };
 
-const EVIDENCE_MIN = 0.25; // PRD FR-03 근거 불일치 기준
-const IMPORTANCE_MIN = 0.35; // 개념과 관련 있다고 보는 청크 유사도
+const EVIDENCE_MIN = 0.5; // PRD FR-03 근거 불일치 기준(qwen3-embedding-4b 관련 0.898·무관 0.346 실측)
+const IMPORTANCE_MIN = 0.6; // 개념과 관련 있다고 보는 청크 유사도
 const CHECK_NAMES: Record<string, string> = {
   answer_correct: "정답",
   evidence_match: "근거 일치",

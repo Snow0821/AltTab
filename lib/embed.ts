@@ -1,6 +1,7 @@
 // 임베딩(소유: 교안 모듈). 서버가 부르는 유일한 AI다. 생성형 LLM은 부르지 않는다.
 // 우선순위: OPENAI_API_KEY(직접) → Vercel AI Gateway(AI_GATEWAY_API_KEY 또는 Vercel 배포의 OIDC 토큰)
-export const EMBED_MODEL = "text-embedding-3-small";
+// Gateway 무료 등급은 openai/text-embedding-3-small을 막는다(2026-10-03 403 실측). 무료 등급에서 호출되는 qwen3-embedding-4b를 1536차원으로 쓴다(PRD 부록 2-13).
+export const EMBED_MODEL = process.env.EMBED_MODEL || "alibaba/qwen3-embedding-4b";
 export const EMBED_DIM = 1536;
 const BATCH = 100;
 
@@ -8,7 +9,7 @@ export class EmbedError extends Error {}
 
 function endpoint(req?: Request): { url: string; key: string; model: string } {
   if (process.env.OPENAI_API_KEY) {
-    return { url: "https://api.openai.com/v1/embeddings", key: process.env.OPENAI_API_KEY, model: EMBED_MODEL };
+    return { url: "https://api.openai.com/v1/embeddings", key: process.env.OPENAI_API_KEY, model: "text-embedding-3-small" };
   }
   const key =
     process.env.AI_GATEWAY_API_KEY ||
@@ -16,7 +17,7 @@ function endpoint(req?: Request): { url: string; key: string; model: string } {
     req?.headers.get("x-vercel-oidc-token") ||
     "";
   if (!key) throw new EmbedError("임베딩 키가 없습니다");
-  return { url: "https://ai-gateway.vercel.sh/v1/embeddings", key, model: `openai/${EMBED_MODEL}` };
+  return { url: "https://ai-gateway.vercel.sh/v1/embeddings", key, model: EMBED_MODEL };
 }
 
 async function call(texts: string[], req?: Request): Promise<number[][]> {
@@ -27,7 +28,7 @@ async function call(texts: string[], req?: Request): Promise<number[][]> {
       res = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, input: texts }),
+        body: JSON.stringify({ model, input: texts, dimensions: EMBED_DIM }),
         signal: AbortSignal.timeout(45_000),
       });
     } catch (e) {
