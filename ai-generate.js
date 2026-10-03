@@ -8,12 +8,38 @@ const MAX_PAGES = 20;
 const MAX_CHARS = 40000;
 const COUNT = 5;
 const CALL_TIMEOUT_MS = 55000;
+// 출제 규칙 판. 규칙이 바뀌면 올린다. 화면은 이 값이 낮은 저장 결과를 옛 규칙으로 만든 문항으로 다룰 수 있다.
+const RULES_VERSION = 2;
 
 // 같은 내용의 동시 요청은 학교 AI를 한 번만 부른다(같은 서버 인스턴스 안).
 const inflight = new Map();
 
 const squash = (s) => String(s || '').replace(/\s+/g, '');
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+
+// 출제 대상 종류. 모델이 각 문제에 적어 보내고, 서버는 이 밖의 값(공지·운영 안내 등)을 거른다.
+const KINDS = new Set(['concept', 'definition', 'principle', 'calculation', 'algorithm', 'comparison', 'application']);
+
+// 수업 운영 안내 판별. 낱말 하나(시험·날짜·시간)가 아니라 "운영 대상 + 운영 속성"이 함께 있을 때만 걸러서
+// 역사 연도, 알고리즘 시간 복잡도, 실험 일정 계산 같은 교과 내용은 남긴다.
+const LOGISTICS = [
+  // 시험 일정·장소
+  /(중간|기말|쪽지|재)\s*(고사|시험)[^.\n]{0,20}(언제|며칠|몇\s*월|몇\s*일|날짜|일자|일시|일정|기간|장소|어디|요일|교시|고사장|강의실|\d+\s*월\s*\d+\s*일)/,
+  /(시험|퀴즈)\s*(일정|날짜|일자|일시|기간|장소|고사장|시간표)/,
+  // 연락처·상담
+  /(교수|강사|조교|담당자)[^.\n]{0,12}(연락처|이메일|e-?mail|전화|연구실|사무실|상담\s*시간)/i,
+  /(오피스\s*아워|office\s*hours?)/i,
+  // 출석·과제·성적 규칙
+  /(출석|결석|지각)[^.\n]{0,12}(규칙|인정|점수|반영|처리|체크|감점|횟수|기준)/,
+  /(과제|레포트|리포트|보고서|프로젝트|제출물)[^.\n]{0,12}(제출\s*(기한|마감|기간|일|날짜)|마감|기한|due)/i,
+  /(성적|평가|학점)[^.\n]{0,12}(반영\s*비율|반영\s*비중|비율|배점|산출|구성|평가\s*방법)/,
+  /(강의실|수업\s*장소|강의\s*장소|수업\s*시간표|강의\s*시간표)/,
+];
+
+function isLogistics(text) {
+  const t = norm(text);
+  return LOGISTICS.some((re) => re.test(t));
+}
 
 function fail(status, error, message, extra = {}) {
   const err = new Error(message);
@@ -38,12 +64,17 @@ function prompt(title, pages, want, avoid) {
   return [
     `아래는 대학 강의 교안 "${title}"의 일부다. 이 내용만 근거로 시험 대비 객관식 문제 ${want}개를 만들어라.`,
     '규칙:',
+    '- 출제 대상은 교안의 개념, 원리, 정의, 계산, 알고리즘, 개념 비교, 적용 사례처럼 시험 공부에 필요한 학습 내용만이다.',
+    '- 출제 제외: 중간·기말고사 날짜와 장소, 강의실, 교수 연락처·오피스아워, 출석 규칙, 과제 제출 기한, 성적 반영 비율 같은 수업 운영 안내. 교안에 적혀 있어도 묻지 않는다. 운영 안내와 학습 내용이 섞인 쪽에서는 학습 내용에서만 출제한다.',
+    '- 역사적 사건의 연도, 알고리즘의 시간 복잡도, 실험 일정 계산처럼 교과 내용이면 날짜·시간을 다뤄도 된다.',
+    '- 학습 내용이 부족하면 억지로 채우지 말고 만들 수 있는 만큼만 돌려준다.',
     '- 문제마다 선택지 정확히 4개, 정답 1개. 오답도 그럴듯하되 교안 기준으로 분명히 틀려야 한다.',
     '- evidence.quote에는 정답의 근거가 되는 문장을 교안에서 글자 그대로 복사해 넣는다(10자 이상, 고치거나 요약하지 않는다). evidence.page는 그 문장이 있는 쪽 번호다.',
+    '- kind에는 문제 종류를 concept(개념·정의), principle(원리), calculation(계산), algorithm(알고리즘), comparison(개념 비교), application(적용 사례) 중 하나로 적는다.',
     '- 교안에 없는 지식으로 묻지 않는다. 같은 내용을 두 번 묻지 않는다.',
     avoid.length ? `- 다음 문제와 겹치지 않게 한다: ${avoid.map((b) => `"${b}"`).join(', ')}` : '',
     '출력은 JSON 하나만. 설명 문장이나 코드 블록 표시 없이:',
-    '{"questions":[{"body":"문제","choices":["보기1","보기2","보기3","보기4"],"answer_index":0,"explanation":"해설","evidence":{"page":1,"quote":"교안 원문 문장"}}]}',
+    '{"questions":[{"kind":"concept","body":"문제","choices":["보기1","보기2","보기3","보기4"],"answer_index":0,"explanation":"해설","evidence":{"page":1,"quote":"교안 원문 문장"}}]}',
     '',
     source,
   ].filter(Boolean).join('\n');
@@ -88,6 +119,8 @@ function parseQuestions(raw) {
   }
 }
 
+const REASON_LOGISTICS = '수업 운영 안내 문항';
+
 // 통과하면 정리된 문항, 아니면 거절 사유 문자열.
 function check(q, pageText, seen) {
   if (!q || typeof q !== 'object') return '형식 오류';
@@ -105,18 +138,23 @@ function check(q, pageText, seen) {
   const quote = norm(q.evidence && q.evidence.quote);
   if (!pageText.has(page)) return '근거 쪽이 범위 밖';
   if (squash(quote).length < 10 || !pageText.get(page).includes(squash(quote))) return '근거 문장이 교안에 없음';
+  // 학습 내용 검사: 모델이 적은 종류가 출제 대상 밖이거나, 문제·근거 문장이 수업 운영 안내면 거른다.
+  const kind = q.kind == null ? null : String(q.kind).trim().toLowerCase();
+  if (kind !== null && !KINDS.has(kind)) return REASON_LOGISTICS;
+  if (isLogistics(body) || isLogistics(quote)) return REASON_LOGISTICS;
   seen.add(squash(body));
-  return { body, choices, answerIndex, explanation, evidence: { page, quote } };
+  return { body, choices, answerIndex, explanation, evidence: { page, quote }, kind: kind || null };
 }
 
-async function generate({ title, pages }) {
+// call: 모델 호출 함수. 검사에서는 모의 응답을 넣는다.
+async function generate({ title, pages }, call = callAI) {
   const pageText = new Map(pages.map((p) => [p.page, squash(p.text)]));
   const seen = new Set();
   const valid = [];
   const rejected = [];
   for (const want of [COUNT + 2, null]) {
     const ask = want || COUNT - valid.length + 2;
-    const raw = await callAI(prompt(title, pages, ask, valid.map((q) => q.body)));
+    const raw = await call(prompt(title, pages, ask, valid.map((q) => q.body)));
     for (const q of parseQuestions(raw)) {
       const r = check(q, pageText, seen);
       if (typeof r === 'string') rejected.push(r);
@@ -125,15 +163,19 @@ async function generate({ title, pages }) {
     if (valid.length >= COUNT) break;
   }
   if (valid.length < COUNT) {
-    throw fail(422, 'not_enough_valid', `검사를 통과한 문제가 ${valid.length}개뿐이에요. 다시 시도하거나 범위를 바꿔 주세요`, {
-      validCount: valid.length,
-      rejectedReasons: rejected.slice(0, 10),
-    });
+    const logisticsCount = rejected.filter((r) => r === REASON_LOGISTICS).length;
+    const extra = { validCount: valid.length, rejectedReasons: rejected.slice(0, 10), logisticsCount };
+    // 운영 안내 때문에 모자라면 억지로 채우지 않고 학습 내용이 있는 범위를 다시 고르게 안내한다.
+    if (logisticsCount > 0) {
+      throw fail(422, 'not_enough_study_content', `고른 범위에는 시험 공부할 학습 내용이 부족해요(운영 안내 문항 ${logisticsCount}개 제외). 강의 내용이 있는 쪽을 다시 골라 주세요`, extra);
+    }
+    throw fail(422, 'not_enough_valid', `검사를 통과한 문제가 ${valid.length}개뿐이에요. 다시 시도하거나 범위를 바꿔 주세요`, extra);
   }
   return {
     ok: true,
     source: 'school-ai',
     model: MODEL,
+    rulesVersion: RULES_VERSION,
     generatedAt: new Date().toISOString(),
     questions: valid.map((q, i) => ({ id: `q${i + 1}`, ...q })),
     rejectedCount: rejected.length,
@@ -159,3 +201,7 @@ module.exports = function registerAiGenerate(app) {
 
 module.exports.check = check;
 module.exports.squash = squash;
+module.exports.generate = generate;
+module.exports.prompt = prompt;
+module.exports.isLogistics = isLogistics;
+module.exports.RULES_VERSION = RULES_VERSION;
