@@ -123,6 +123,24 @@ function pageShell(title, bodyHtml) {
   .mcp-box code, .mcp-box input[readonly] { background: #f1f1f6; padding: 2px 6px; border-radius: 6px; font-size: 0.85rem; }
   .mcp-box input[readonly] { border: 1px solid #ddd; width: 100%; margin-top: 4px; font-family: monospace; }
   .mcp-box ol { margin: 8px 0 0 18px; padding: 0; }
+  .course-tag { font-size: 0.75rem; color: #0369a1; background: #e0f2fe; padding: 2px 6px; border-radius: 6px; }
+  .course-folder { margin-top: 10px; }
+  .course-folder > summary { font-size: 1.02rem; font-weight: 700; cursor: pointer; padding: 10px 12px; background: #eef2ff; border-radius: 8px; list-style: none; }
+  .course-folder > summary::-webkit-details-marker { display: none; }
+  .course-folder > summary::before { content: '▸ '; }
+  .course-folder[open] > summary::before { content: '▾ '; }
+  .week-folder { margin: 8px 0 8px 20px; }
+  .week-folder > summary { font-weight: 600; cursor: pointer; padding: 6px 10px; background: #f8fafc; border-radius: 6px; font-size: 0.88rem; color: #333; list-style: none; }
+  .week-folder > summary::-webkit-details-marker { display: none; }
+  .week-folder > summary::before { content: '▸ '; }
+  .week-folder[open] > summary::before { content: '▾ '; }
+  .week-folder ul { margin: 8px 0 0 8px; }
+  input[type=text].course-input { padding: 8px; border: 1px solid #ddd; border-radius: 8px; width: 100%; }
+  .share-section { margin-top: 24px; }
+  .share-section h2 { margin-bottom: 4px; }
+  .share-section .sub { color: #777; font-size: 0.85rem; margin: 0 0 10px; }
+  .share-group { margin-top: 12px; }
+  .share-group h4 { margin: 0 0 4px; font-size: 0.9rem; color: #333; }
 </style>
 </head>
 <body>
@@ -168,8 +186,8 @@ function mcpInstructionsHtml(req) {
   </div>`;
 }
 
-function renderPage(fileList, message, req) {
-  const items = fileList.map((f) => `
+function renderFileItem(f) {
+  return `
     <li class="file-item">
       <div class="file-main">
         <a href="/uploads/${encodeURIComponent(f.storedName)}" target="_blank" rel="noopener">${escapeHtml(f.originalName)}</a>
@@ -180,25 +198,73 @@ function renderPage(fileList, message, req) {
         ${f.questions ? `<a href="/questions/${encodeURIComponent(f.storedName)}"><button type="button" class="secondary">생성된 문제 보기</button></a>` : '<span class="meta">아직 문제 없음</span>'}
       </div>
     </li>
-  `).join('');
+  `;
+}
 
+function groupMaterialsByCourseAndWeek(fileList) {
+  const groups = new Map();
+  for (const f of fileList) {
+    const groupKey = `${f.course}|||${f.professor}`;
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, { course: f.course, professor: f.professor, weeks: new Map() });
+    }
+    const group = groups.get(groupKey);
+    const weekKey = String(f.week);
+    if (!group.weeks.has(weekKey)) group.weeks.set(weekKey, []);
+    group.weeks.get(weekKey).push(f);
+  }
+
+  const sortedGroups = Array.from(groups.values()).sort((a, b) =>
+    a.course.localeCompare(b.course, 'ko') || a.professor.localeCompare(b.professor, 'ko')
+  );
+  for (const group of sortedGroups) {
+    group.weeks = new Map(Array.from(group.weeks.entries()).sort((a, b) => Number(a[0]) - Number(b[0])));
+  }
+  return sortedGroups;
+}
+
+function renderFileTree(fileList) {
+  if (!fileList.length) return '<p class="empty">아직 업로드된 파일이 없습니다.</p>';
+
+  const groups = groupMaterialsByCourseAndWeek(fileList);
+  return groups.map((group) => {
+    const weekSections = Array.from(group.weeks.entries()).map(([week, files]) => `
+      <details class="week-folder" open>
+        <summary>${escapeHtml(week)}주차 (${files.length})</summary>
+        <ul>${files.map(renderFileItem).join('')}</ul>
+      </details>
+    `).join('');
+
+    return `
+      <details class="course-folder" open>
+        <summary>${escapeHtml(group.course)} · ${escapeHtml(group.professor)} 교수</summary>
+        ${weekSections}
+      </details>
+    `;
+  }).join('');
+}
+
+function renderPage(fileList, message, req) {
   const body = `
   <h1>교안 PDF 업로드</h1>
   <form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="text" name="course" class="course-input" placeholder="과목명 (예: 알고리즘)" required>
+    <input type="text" name="professor" class="course-input" placeholder="교수명 (예: 이현기)" required>
+    <input type="number" name="week" class="course-input" placeholder="몇 주차 수업인가요? (예: 4)" min="1" max="20" required>
     <input type="file" name="pdf" accept="application/pdf" required>
     <button type="submit">업로드</button>
   </form>
   ${message ? `<div class="message ${message.type === 'error' ? 'error' : ''}">${escapeHtml(message.text)}</div>` : ''}
   <h2>업로드된 교안</h2>
-  ${items ? `<ul>${items}</ul>` : '<p class="empty">아직 업로드된 파일이 없습니다.</p>'}
+  ${renderFileTree(fileList)}
   ${mcpInstructionsHtml(req)}
   `;
 
   return pageShell('PassFinder - 교안 업로드', body);
 }
 
-function renderQuestionsPage(entry) {
-  const cards = entry.questions.map((q, i) => {
+function renderQuestionCards(questions) {
+  return questions.map((q, i) => {
     const options = q.options.map((opt) => `<li>${escapeHtml(opt)}</li>`).join('');
     const answerText = q.options[q.answer_index] !== undefined ? q.options[q.answer_index] : '?';
     return `
@@ -213,10 +279,43 @@ function renderQuestionsPage(entry) {
     </div>
   `;
   }).join('');
+}
+
+function renderSharedGroup(entries) {
+  return entries.map((f) => `
+    <div class="share-group">
+      <h4>${escapeHtml(f.originalName)} · ${escapeHtml(f.professor)} 교수 · ${escapeHtml(f.week)}주차</h4>
+      ${renderQuestionCards(f.questions)}
+    </div>
+  `).join('');
+}
+
+function renderQuestionsPage(entry, allList) {
+  // Only surface questions from materials covering the exact same week —
+  // otherwise "more practice" silently mixes in a different lecture's scope.
+  const sameWeek = (f) =>
+    f.storedName !== entry.storedName && f.course === entry.course && String(f.week) === String(entry.week) && f.questions && f.questions.length;
+
+  const sameProfessor = allList.filter((f) => sameWeek(f) && f.professor === entry.professor);
+  const otherProfessor = allList.filter((f) => sameWeek(f) && f.professor !== entry.professor);
 
   const body = `
   <h1>${escapeHtml(entry.originalName)} - 생성된 문제</h1>
-  ${cards}
+  <p class="meta">${escapeHtml(entry.course)} · ${escapeHtml(entry.professor)} 교수 · ${escapeHtml(entry.week)}주차</p>
+  ${renderQuestionCards(entry.questions)}
+
+  <div class="share-section">
+    <h2>같은 주차 · 같은 교수님 문제 더 풀어보기</h2>
+    <p class="sub">다른 사람이 이 교수님의 "${escapeHtml(entry.course)}" ${escapeHtml(entry.week)}주차 자료로 만든 문제입니다.</p>
+    ${sameProfessor.length ? renderSharedGroup(sameProfessor) : '<p class="empty">아직 없습니다.</p>'}
+  </div>
+
+  <div class="share-section">
+    <h2>같은 주차 · 다른 교수님 문제 더 풀어보기</h2>
+    <p class="sub">다른 교수님의 "${escapeHtml(entry.course)}" ${escapeHtml(entry.week)}주차 자료로 만든 문제입니다.</p>
+    ${otherProfessor.length ? renderSharedGroup(otherProfessor) : '<p class="empty">아직 없습니다.</p>'}
+  </div>
+
   <a class="back-link" href="/">&larr; 목록으로 돌아가기</a>
   `;
 
@@ -236,6 +335,14 @@ app.post('/upload', (req, res) => {
       return res.status(400).send(renderPage(readMetadata(), { type: 'error', text: '파일을 선택해주세요.' }, req));
     }
 
+    const course = (req.body.course || '').trim();
+    const professor = (req.body.professor || '').trim();
+    const week = (req.body.week || '').trim();
+    if (!course || !professor || !week || !Number.isInteger(Number(week)) || Number(week) < 1) {
+      fs.unlinkSync(path.join(uploadDir, req.file.filename));
+      return res.status(400).send(renderPage(readMetadata(), { type: 'error', text: '과목명, 교수명, 주차(숫자)를 모두 입력해주세요.' }, req));
+    }
+
     try {
       await extractAndCacheText(req.file.filename);
     } catch (extractErr) {
@@ -247,7 +354,10 @@ app.post('/upload', (req, res) => {
       originalName: fixMulterFilenameEncoding(req.file.originalname),
       storedName: req.file.filename,
       size: formatSize(req.file.size),
-      uploadedAt: new Date().toLocaleString('ko-KR')
+      uploadedAt: new Date().toLocaleString('ko-KR'),
+      course,
+      professor,
+      week: Number(week)
     });
     writeMetadata(list);
     res.redirect('/');
@@ -260,7 +370,7 @@ app.get('/questions/:storedName', (req, res) => {
   if (!entry || !entry.questions) {
     return res.redirect('/');
   }
-  res.send(renderQuestionsPage(entry));
+  res.send(renderQuestionsPage(entry, list));
 });
 
 // --- MCP server: exposes uploaded materials to the user's own AI client ---
@@ -269,12 +379,15 @@ function buildMcpServer() {
   const server = new McpServer({ name: 'passfinder-mcp', version: '0.1.0' });
 
   server.registerTool('list_materials', {
-    description: '업로드된 교안 자료 목록을 반환합니다. 각 자료는 id(=자료 ID), title, uploadedAt, hasQuestions를 포함합니다.'
+    description: '업로드된 교안 자료 목록을 반환합니다. 각 자료는 id(=자료 ID), title, course, professor, week(주차), uploadedAt, hasQuestions를 포함합니다.'
   }, async () => {
     const list = readMetadata();
     const materials = list.map((f) => ({
       id: f.storedName,
       title: f.originalName,
+      course: f.course,
+      professor: f.professor,
+      week: f.week,
       uploadedAt: f.uploadedAt,
       hasQuestions: Boolean(f.questions)
     }));
@@ -325,15 +438,23 @@ function buildMcpServer() {
     return { content: [{ type: 'text', text: `${questions.length}개의 문제가 저장되었습니다. 자료 ID: ${id}` }] };
   });
 
+  const STYLE_GUIDANCE = {
+    concept: '개념/정의/용어를 정확히 아는지 확인하는 문제를 중심으로 만든다. 계산이나 응용 비중은 낮춘다.',
+    applied: '개념을 실제 상황, 예시, 계산에 적용하는 문제를 중심으로 만든다. 단순 정의를 묻는 문제는 1개 이하로 줄인다.',
+    mixed: '개념 확인 문제와 응용 문제를 절반씩 섞는다.'
+  };
+
   server.registerPrompt('generate_quiz', {
     title: '출제 기준에 맞춰 문제 생성',
     description: '자료 ID를 지정하면, 출제 기준(난이도 배분/오답 품질/근거 기반 등)을 포함한 전체 지시문을 생성합니다.',
     argsSchema: {
       materialId: z.string().describe('문제를 생성할 자료 ID (list_materials 결과의 id 값)'),
-      count: z.string().optional().describe('생성할 문제 개수 (기본값 5)')
+      count: z.string().optional().describe('생성할 문제 개수 (기본값 5)'),
+      style: z.string().optional().describe('문항 스타일: concept(개념확인 중심) / applied(응용·사례 중심) / mixed(혼합, 기본값)')
     }
-  }, async ({ materialId, count }) => {
+  }, async ({ materialId, count, style }) => {
     const n = count && Number.isFinite(Number(count)) ? Number(count) : 5;
+    const styleKey = style && STYLE_GUIDANCE[style] ? style : 'mixed';
     const text = [
       '너는 대학생의 시험 대비를 돕는 문제 출제자야. 아래 절차와 출제 기준을 반드시 지켜서 문제를 만들어줘.',
       '',
@@ -345,6 +466,7 @@ function buildMcpServer() {
       '[출제 기준]',
       '- 모든 문제와 정답은 반드시 가져온 자료 본문에 근거해야 한다. 자료에 없는 내용을 지어내지 않는다.',
       '- 자료 전체 범위를 균형 있게 다룬다. 앞부분 내용에만 몰리지 않게 한다.',
+      `- 문항 스타일: ${STYLE_GUIDANCE[styleKey]}`,
       '- 난이도는 쉬운 것부터 어려운 순서로 배치한다:',
       '  - 앞쪽 1~2개: 핵심 용어/정의를 묻는 쉬운 확인 문제',
       '  - 중간: 개념 간 관계나 적용을 묻는 문제',
