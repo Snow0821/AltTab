@@ -1,7 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const sql = fs.readFileSync(path.join(__dirname, '../supabase/migrations/20261003063714_alttab_v2_exams.sql'), 'utf8');
+const sql = fs.readFileSync(path.join(__dirname, '../supabase/migrations/20261003063714_alttab_v2_exams.sql'), 'utf8').replace(/\r\n/g, '\n');
 const questions = JSON.parse(sql.match(/'(\[\n[\s\S]+?\n \])'::jsonb/)[1]);
 
 function memoryStore() {
