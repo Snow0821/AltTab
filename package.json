@@ -2,7 +2,7 @@
   "name": "passfinder",
   "version": "0.1.0",
   "private": true,
-  "description": "passfinder MVP - 교안 PDF 업로드/확인",
+  "description": "PassFinder - 교안 PDF로 객관식 5문제를 만들고 풀고 복습하는 서비스",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

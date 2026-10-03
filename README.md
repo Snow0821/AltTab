@@ -1,8 +1,8 @@
-# passfinder
+# PassFinder
 
 팀: AltTab
 
-문제·필수 기능·구현 상태는 [passfinder PRD](passfinder-prd.md) 한 개를 기준으로 합니다. 같은 시험 공유·결과 비교·풀이 참고가 핵심입니다. 세트 저장·출제·채점 API는 일부 구현됐고 DB·비교·화면 연결은 남아 있습니다.
+문제·필수 기능·구현 상태는 [PassFinder PRD](passfinder-prd.md) 한 개를 기준으로 합니다. 이번 제출의 필수 기능은 교안으로 AI 객관식 5문제 만들기·풀이·오답 복습(FR-12A~D)입니다. 같은 시험 공유·결과 비교·풀이 참고(FR-13~15)는 다음 단계이며, 세트 저장·출제·채점 API만 일부 있습니다.
 
 - 개발 담당: [클로드에게 전달할 서버·DB 구현 지시](docs/클로드_공통시험_구현지시.md). UI는 별도 담당자가 수정합니다.
 - 발표 담당: [제작 흐름](docs/presentation/발표제작흐름.md), [제작 원칙](docs/presentation/발표자료_제작원칙_공유용.md).
@@ -20,11 +20,11 @@ npm install
 npm start
 ```
 
-브라우저에서 `http://localhost:3000/`로 접속하면 `index.html`의 통합 화면이 열립니다. AI 문제 만들기는 `/study/make.html`, 기존 PDF 업로드 화면은 `/upload`에서 이용할 수 있습니다. 실제 AI 생성에는 서버의 `KOOKMIN_KEY` 설정이 필요합니다.
+브라우저에서 `http://localhost:3000/`로 접속하면 `index.html`의 통합 화면이 열립니다. AI 문제 만들기는 `/study/make.html`, 기존 PDF 업로드 화면은 `/materials-upload`, 샘플 문제은행은 `/study/bank.html`, 연결 점검 화면은 `/mock/`(운영 확인용)에서 이용할 수 있습니다. 실제 AI 생성에는 서버의 `KOOKMIN_KEY` 설정이 필요합니다.
 
 ## 배포
 
-Node.js(`>=18`)를 지원하는 플랫폼(Render, Railway 등)에 `npm install && npm start`로 배포 가능합니다. 환경변수 `PORT`를 플랫폼이 지정하면 자동으로 사용합니다.
+실제 배포는 Vercel이며 `main`에 push하면 자동으로 다시 배포됩니다(공개 주소 https://alt-tab-mu.vercel.app). 환경 변수는 `KOOKMIN_KEY`(학교 AI 키, 문제 생성에 필수), `SUPABASE_KEY`(선택, 연결 점검·점수 저장용)이며 값은 서버 설정에만 둡니다. Node.js(`>=18`)를 지원하는 다른 플랫폼에도 `npm install && npm start`로 배포할 수 있고 `PORT`는 플랫폼 값을 따릅니다. Vercel에서는 디스크 저장이 임시라 업로드 파일과 세트가 재배포 때 사라집니다.
 
 ## 협업 안내
 
