@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f7f7f5;
+  --ink: #1d1d1b;
+  --muted: #6b6b66;
+  --line: #e2e1dc;
+  --accent: #2f6fdb;
+  --ok: #1f8a4c;
+  --bad: #c2412d;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  word-break: keep-all;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-ghost {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.msg-error {
+  color: var(--bad);
+}
+.msg-ok {
+  color: var(--ok);
+}

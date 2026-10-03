@@ -1,3 +1,11 @@
 node_modules/
 uploads/
 .DS_Store
+# Next.js 빌드 결과와 로컬 환경(비밀값)은 올리지 않는다
+.next/
+*.tsbuildinfo
+next-env.d.ts
+.env*
+!.env.example
+.vercel
+*.pdf
