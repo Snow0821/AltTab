@@ -23,6 +23,10 @@ header{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:white;bor
 .login-view>header{display:none}.login-view .workspace{margin:0}.login-view .topbar,.login-view .demo-banner,.login-view footer{display:none}.login-view main{max-width:none;padding:0;min-height:100dvh}.login-shell{display:grid;grid-template-columns:minmax(0,1fr) minmax(440px,1fr);min-height:100dvh;background:#fff}.login-story{padding:48px 56px;background:#e9f2ed;display:flex;flex-direction:column;justify-content:space-between;min-height:100dvh}.login-brand{display:flex;align-items:center;gap:10px;font-size:25px;font-weight:800;letter-spacing:-1px}.login-brand>span:last-child{color:var(--blue);margin-left:-8px}.login-message{padding:60px 0}.login-tag{font-size:11px;letter-spacing:2px;color:#578070;font-weight:750}.login-message h1{font-size:clamp(36px,3.6vw,54px);font-weight:750;letter-spacing:-2px;line-height:1.4;margin:24px 0;color:#173d32}.login-message p{font-size:17px;color:#638174;line-height:1.9}.story-steps{display:flex;gap:20px;flex-wrap:wrap;margin-top:44px;padding-top:22px;border-top:1px solid #cee0d5;color:#567a6a;font-size:13px}.story-foot{font-size:12px;color:#729282}.login-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 40px;position:relative}.login-form-wrap{width:100%;max-width:370px}.login-form-wrap h2{font-size:30px;font-weight:750;letter-spacing:-1px;margin:12px 0}.login-subtitle{color:#81928a;font-size:14px;margin:0 0 34px}.login-form-wrap label{font-size:13px;font-weight:650;margin-top:20px;color:#3d594d}.login-form-wrap input{width:100%;height:52px;border:1px solid #dfe8e2;border-radius:10px;background:#fafcfb;padding:14px 16px;margin:9px 0 0;font-size:14px}.login-form-wrap input:focus{background:white}.password-field{position:relative}.password-field input{padding-right:65px}.password-toggle{position:absolute;right:8px;top:17px;border:0;background:none;padding:7px 9px;font-size:12px;color:#6e887a}.login-submit{margin-top:28px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:15px}.login-divider{display:flex;align-items:center;gap:16px;color:#99a79f;font-size:12px;margin:26px 0 18px}.login-divider:before,.login-divider:after{content:'';flex:1;height:1px;background:#e7ede9}.preview-button{font-size:14px;height:48px;background:white;border-color:#dfe8e2;color:#587969;font-weight:550}.login-note{font-size:11px;color:#98a79e;text-align:center;line-height:1.8;margin-top:22px}.login-copyright{font-size:10px;color:#a6b2ab;position:absolute;bottom:22px}.logout{font-size:12px!important;margin-top:16px;color:#8a9c92!important}
 @media(max-width:850px){.login-shell{grid-template-columns:1fr}.login-story{display:none}.login-panel{min-height:100dvh;padding:48px 24px}.login-form-wrap:before{content:'PassFinder.';display:block;color:var(--blue);font-size:25px;font-weight:800;letter-spacing:-1px;margin-bottom:42px}}
 @media(max-width:700px){.course-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.course-grid .course{width:100%;height:auto;aspect-ratio:1;min-height:165px;padding:16px;border-radius:15px;gap:12px}.course-heading{gap:9px}.course-heading h2{font-size:17px;line-height:1.35}.course-grid .course-open{font-size:12px;padding:8px;min-height:36px}.favorite{height:25px;width:25px;font-size:23px}.course-grid .new-course-card h2{font-size:14px}}
+
+/* Calm editorial cards: a small label, title, useful description, one clear action. */
+.course-grid article.course{padding:20px;gap:9px;justify-content:flex-start;border:1px solid #e1e9e4;background:#fff}.course-tag{align-self:flex-start;padding:3px 8px;border-radius:6px;background:#edf5f0;color:#52816c;font-size:10px;font-weight:650;letter-spacing:.3px;line-height:1.5}.course-grid article.course h2{font-size:19px;line-height:1.35;letter-spacing:-.55px;margin:3px 0 0;font-weight:750;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.course-description{font-size:12px;line-height:1.65;color:#82938a;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.course-grid .course-open{min-height:36px;padding:8px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;justify-content:space-between}.course-open span{font-size:16px;font-weight:400}textarea{width:100%;resize:vertical;min-height:90px;max-height:230px;border:1px solid var(--line);border-radius:10px;background:#fafcfb;color:var(--ink);font:inherit;font-size:14px;padding:12px 14px;margin-top:9px;line-height:1.6}textarea:focus-visible{outline:3px solid #50a895;outline-offset:3px}.modal label .small{font-size:12px;font-weight:400}
+@media(max-width:700px){.course-grid article.course{padding:15px;min-height:190px;gap:7px}.course-grid article.course h2{font-size:16px}.course-description{font-size:11px}.course-tag{font-size:9px}.course-grid .course-open{min-height:32px;font-size:11px}}
 </style>
 </head>
 <body>
@@ -233,8 +237,10 @@ function render() {
       <div class="grid course-grid">
         ${courses.map((c,i) => `
           <article class="card course" data-course-id="${escapeHTML(c.id)}">
-            <div class="course-heading"><h2>${escapeHTML(c.name)}</h2><button class="favorite ${c.favorite ? 'is-favorite' : ''}" onclick="toggleFavorite(${i})" aria-label="${escapeHTML(c.name)} 즐겨찾기" aria-pressed="${!!c.favorite}" title="즐겨찾기">${c.favorite ? '★' : '☆'}</button></div>
-            <button class="primary course-open" onclick="openCourse(${i})">과목 열기 →</button>
+            <span class="course-tag">${c.demo ? '샘플 과목' : '나의 과목'}</span>
+            <h2>${escapeHTML(c.name)}</h2>
+            <p class="course-description" title="${escapeHTML(c.description || defaultDescription(c))}">${escapeHTML(c.description || defaultDescription(c))}</p>
+            <button class="primary course-open" onclick="openCourse(${i})">과목 열기 <span aria-hidden="true">↗</span></button>
           </article>`).join('')}
         <button class="card course new-course-card" onclick="newCourse()" aria-label="새 과목 만들기"><span class="add-icon">＋</span><h2>새 과목 만들기</h2></button>
       </div>
@@ -612,12 +618,8 @@ function togglePassword(button) {
   button.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 표시');
 }
 
-function toggleFavorite(i) {
-  if (!courses[i]) return;
-  courses[i].favorite = !courses[i].favorite;
-  persistCourses();
-  render();
-  document.querySelectorAll('.favorite')[i]?.focus();
+function defaultDescription(item) {
+  return ({os:'프로세스와 메모리 관리, 시험에 필요한 핵심 개념을 한 단계씩.',ds:'스택부터 트리까지, 개념을 익히고 문제로 확인하는 자료구조.',net:'교안을 연결하고 네트워크의 주요 개념을 함께 정리해 보세요.'})[item.id] || '교안을 연결하고 나만의 문제로 시험을 준비하세요.';
 }
 
 function openCourse(i) {
@@ -888,8 +890,10 @@ function newCourse() {
         placeholder="예: 운영체제 중간고사">
     </label>
 
-    <button class="primary wide" onclick="createCourse()">
-      만들기
+    <label for="courseDescription">과목 설명 <span class="muted small">선택</span></label>
+    <textarea id="courseDescription" maxlength="160" rows="3" placeholder="예: 중간고사 범위의 개념과 문제를 정리하는 공간"></textarea>
+    <button class="primary wide" onclick="createCourse()" style="margin-top:20px">
+      과목 만들기
     </button>
   `);
 }
@@ -901,7 +905,8 @@ function createCourse() {
     return toast('과목 이름을 입력해 주세요.');
   }
 
-  const item = {id:crypto.randomUUID(), name, demo:false};
+  const description = $('#courseDescription').value.trim();
+  const item = {id:crypto.randomUUID(), name, description, demo:false};
   courses.push(item);
   persistCourses();
   closeModal();
@@ -945,7 +950,7 @@ document.addEventListener('keydown', e => {
 
   if (e.key === 'Tab') {
     const f = [
-      ...$('#modal').querySelectorAll('button,input,summary,a')
+      ...$('#modal').querySelectorAll('button,input,textarea,summary,a')
     ].filter(x => !x.disabled);
 
     if (!f.length) return;
