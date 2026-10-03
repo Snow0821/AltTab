@@ -411,12 +411,79 @@ function stageUnit(stageId) {
   return order === null ? null : Math.ceil(order / UNIT_SIZE);
 }
 
+/**
+ * 사용자의 과목 진행 상황 집계 (FR-04 일부, 이용권 잠금 제외).
+ * attempts.json에서 user의 채점 결과를 읽어 스테이지별 최고 별/클리어 여부와
+ * 누적 XP를 집계한다. 이용권에 따른 잠금은 호출부(server)에서 결합한다.
+ *
+ * 반환:
+ *   { courseId, userId, totalXp, stages:[{ stageId, order, unit, cleared, stars, status }], summary }
+ *   status: 'cleared' | 'open' | 'locked'  (잠금 규칙: 첫 스테이지 열림, 앞 스테이지 클리어 시 다음 열림)
+ */
+function getProgress(courseId = COURSE.id, userId = 'anonymous') {
+  const uid = String(userId || 'anonymous');
+  const attempts = Object.values(readAttempts());
+
+  // 스테이지별 집계: 최고 별, 클리어 여부
+  const byStage = {}; // stageId -> { stars, cleared }
+  let totalXp = 0;
+
+  for (const a of attempts) {
+    if (!a || a.userId !== uid || !a.stageId) continue;
+    if (!a.graded || !a.result) continue;
+    const r = a.result;
+    totalXp += Number(r.xpAwarded) || 0; // 최초 채점에서만 지급된 값이라 중복 없음
+    const prev = byStage[a.stageId] || { stars: 0, cleared: false };
+    byStage[a.stageId] = {
+      stars: Math.max(prev.stars, Number(r.stars) || 0),
+      cleared: prev.cleared || !!r.passed
+    };
+  }
+
+  const stageIds = Object.keys(STAGES);
+  const stages = [];
+  let prevCleared = true; // 첫 스테이지는 앞이 "클리어된 것"으로 간주 → 열림
+
+  for (let i = 0; i < stageIds.length; i++) {
+    const stageId = stageIds[i];
+    const agg = byStage[stageId] || { stars: 0, cleared: false };
+    let status;
+    if (agg.cleared) status = 'cleared';
+    else if (prevCleared) status = 'open';
+    else status = 'locked';
+
+    stages.push({
+      stageId,
+      order: i + 1,
+      unit: Math.ceil((i + 1) / UNIT_SIZE),
+      cleared: agg.cleared,
+      stars: agg.stars,
+      status
+    });
+    // 다음 스테이지 열림 여부는 "이 스테이지 클리어"에 달림
+    prevCleared = agg.cleared;
+  }
+
+  const clearedCount = stages.filter((s) => s.cleared).length;
+  const totalStages = stages.length;
+  const progressPercent = totalStages ? Math.round((clearedCount / totalStages) * 100) : 0;
+
+  return {
+    courseId,
+    userId: uid,
+    totalXp,
+    stages,
+    summary: { clearedCount, totalStages, progressPercent, totalXp }
+  };
+}
+
 module.exports = {
   createAttempt,
   createAttemptFromSet,
   saveQuestionSet,
   getQuestionSet,
   gradeAttempt,
+  getProgress,
   listStages,
   stageOrder,
   stageUnit,

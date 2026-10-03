@@ -326,6 +326,44 @@ app.post('/api/question-sets/:setId/attempts', (req, res) => {
   }
 });
 
+// ===== 진행률 / 스테이지 맵 (FR-04 일부) =====
+// GET /api/courses/:courseId/progress?userId=
+// 스테이지별 상태(잠금/열림/클리어)·별·요약(진행률/XP)을 반환한다.
+// 선수 스테이지 잠금(exam)과 이용권 잠금(entitlements)을 결합한다.
+app.get('/api/courses/:courseId/progress', (req, res) => {
+  try {
+    const userId = req.query.userId || 'anonymous';
+    const courseId = req.params.courseId;
+    const progress = exam.getProgress(courseId, userId);
+
+    // 이용권 잠금 결합: 무료 유닛을 넘는 스테이지는 이용권 없으면 locked로 덮어쓴다.
+    const stages = progress.stages.map((s) => {
+      const access = entitlements.getAccess(courseId, userId, { stageUnit: s.unit });
+      if (!access.canPlay && s.status !== 'cleared') {
+        return { ...s, status: 'locked', lockReason: 'payment_required' };
+      }
+      return s;
+    });
+
+    const access = entitlements.getAccess(courseId, userId);
+    res.json({
+      ok: true,
+      ...progress,
+      stages,
+      entitlement: {
+        hasEntitlement: access.hasEntitlement,
+        entitlementType: access.entitlementType,
+        expiresAt: access.expiresAt,
+        paymentMode: access.paymentMode,
+        freeUnitLimit: access.freeUnitLimit
+      }
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`passfinder MVP server running on http://localhost:${PORT}`);
   console.log(`[scores] 저장 모드: ${scores.getMode()}`);
