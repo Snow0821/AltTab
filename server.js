@@ -85,7 +85,7 @@ function renderPage(fileList, message) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PassFinder - 교안 업로드</title>
+<title>passfinder - 교안 업로드</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px 16px; background: #f7f7fb; color: #1a1a1a; }
@@ -292,6 +292,6 @@ app.post('/api/attempts/:attemptId/answers', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`PassFinder MVP server running on http://localhost:${PORT}`);
+  console.log(`passfinder MVP server running on http://localhost:${PORT}`);
   console.log(`[scores] 저장 모드: ${scores.getMode()}`);
 });

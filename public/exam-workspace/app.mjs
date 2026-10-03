@@ -82,7 +82,7 @@ function render({ focusHeading = false } = {}) {
   const cursor = active instanceof HTMLInputElement && ['text', 'search'].includes(active.type) ? active.selectionStart : null;
   const page = route();
   document.querySelector('#page-crumb').textContent = labels[page];
-  document.title = `PassFinder · ${labels[page]}`;
+  document.title = `passfinder · ${labels[page]}`;
   document.querySelectorAll('[data-nav]').forEach((link) => {
     const current = link.dataset.nav === (page === 'take' ? 'papers' : page);
     if (current) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');

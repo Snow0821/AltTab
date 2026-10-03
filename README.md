@@ -1,4 +1,6 @@
-# AltTab (PassFinder MVP)
+# passfinder
+
+팀: AltTab
 
 **현재 제출용 AI 학습 화면:** [교안으로 문제 만들기](https://alt-tab-mu.vercel.app/study/make.html). 서버가 학교 AI를 호출하며 학생의 개인 AI 설정은 필요 없습니다. 결과는 해당 브라우저에 저장됩니다.
 

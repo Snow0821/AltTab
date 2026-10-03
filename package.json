@@ -1,8 +1,8 @@
 {
-  "name": "passfinder-mvp",
+  "name": "passfinder",
   "version": "0.1.0",
   "private": true,
-  "description": "PassFinder MVP - 교안 PDF 업로드/확인",
+  "description": "passfinder MVP - 교안 PDF 업로드/확인",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
