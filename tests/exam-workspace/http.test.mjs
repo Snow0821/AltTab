@@ -40,7 +40,7 @@ test('index is the home page, study assets serve correctly, and PDF upload flow 
       assert.equal(await response.text(), homeText);
     }
     assert.match(homeText, /let page = 'login'/);
-    const page = await fetch(`${origin}/study/bank.html`); assert.equal(page.status, 200); assert.match(await page.text(), /샘플 데이터로 체험/);
+    const page = await fetch(`${origin}/study/bank.html`); assert.equal(page.status, 200); assert.match(await page.text(), /샘플 문제은행이에요/);
     for (const asset of ['styles.css', 'app.mjs', 'domain.mjs', 'demo-data.mjs']) {
       const response = await fetch(`${origin}/study/${asset}`); assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type'), asset.endsWith('.css') ? /text\/css/ : /javascript/);

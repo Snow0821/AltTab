@@ -7,7 +7,7 @@ import * as fixtures from '../../public/exam-workspace/demo-data.mjs';
 const { JSDOM } = await import(process.env.JSDOM_MODULE || 'jsdom');
 const html = fs.readFileSync(new URL('../../public/exam-workspace/index.html', import.meta.url), 'utf8');
 const source = fs.readFileSync(new URL('../../public/exam-workspace/app.mjs', import.meta.url), 'utf8')
-  .replace(/^import .*;\n/gm, '')
+  .replace(/^import .*;\r?\n/gm, '')
   .replace(/^/, 'const { DEMO_COURSE, DEMO_QUESTIONS: questions } = globalThis.__fixtures;\nconst { filterQuestions, selectedQuestions, gradeDemo, insufficientRanking, rankingView, escapeHtml: esc } = globalThis.__helpers;\n');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 12));
 function setup(hash = '') {
@@ -56,7 +56,7 @@ test('initial empty states, search filters, IME, and selection remain coherent',
     assert.equal(c.q('#search'), field); // composition input is not destroyed
     field.value = '스택'; field.dispatchEvent(new c.window.CompositionEvent('compositionend', { bubbles: true }));
     assert.equal(c.document.querySelectorAll('.question-card').length, 2);
-    await navigate(c, 'results'); assert.match(c.q('main').textContent, /아직 풀이 결과가 없어요/);
+    await navigate(c, 'results'); assert.match(c.q('main').textContent, /아직 샘플 풀이 결과가 없어요/);
     await navigate(c, 'ranking'); assert.match(c.q('.ranking-card').textContent, /표본 부족/);
     assert.match(c.q('.rank-facts').textContent, /실제 비교 표본0명/);
   } finally { c.window.close(); }
@@ -108,7 +108,7 @@ test('interrupted exam resumes, incomplete submission is blocked, repeated submi
 test('new browser session does not pretend to restore saved data and unknown routes remain safe', () => {
   const results = setup('#results'); const take = setup('#take'); const unknown = setup('#unknown');
   try {
-    assert.match(results.q('main').textContent, /아직 풀이 결과가 없어요/);
+    assert.match(results.q('main').textContent, /아직 샘플 풀이 결과가 없어요/);
     assert.match(take.q('main').textContent, /진행 중인 풀이가 없어요/);
     assert.equal(unknown.document.querySelectorAll('.question-card').length, 8);
     assert.match(results.q('.demo-banner').textContent, /서버에 저장되지 않으며/);

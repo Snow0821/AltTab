@@ -140,8 +140,8 @@ function submit() {
 
 function sourceBadge(set) {
   return set.source === 'sample'
-    ? '<span class="badge sample">샘플(AI 호출 없음)</span>'
-    : `<span class="badge">학교 AI 생성 · ${esc(set.model)} · ${esc(timeText(set.generatedAt))}</span>`;
+    ? '<span class="badge sample">샘플 문제</span>'
+    : `<span class="badge">교안에서 생성 · ${esc(timeText(set.generatedAt))}</span>`;
 }
 
 function render() {
