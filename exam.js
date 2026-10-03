@@ -81,6 +81,167 @@ function writeAttempts(map) {
   fs.writeFileSync(attemptsFile, JSON.stringify(map, null, 2));
 }
 
+// ----- 생성 문제 세트 저장소 (로컬 JSON 폴백) -----
+// 팀원의 /api/generate(ai-generate.js)가 만든 문제를 저장해 두고,
+// 그 세트로 출제/채점한다. Supabase 담당이 테이블을 켜면 같은 패턴으로 전환 가능.
+const questionSetsFile = path.join(dataRoot, 'uploads', 'question-sets.json');
+
+function ensureSetStore() {
+  const dir = path.dirname(questionSetsFile);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(questionSetsFile)) fs.writeFileSync(questionSetsFile, '{}');
+}
+
+function readSets() {
+  ensureSetStore();
+  try {
+    return JSON.parse(fs.readFileSync(questionSetsFile, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeSets(map) {
+  ensureSetStore();
+  fs.writeFileSync(questionSetsFile, JSON.stringify(map, null, 2));
+}
+
+// 생성 문제 1건을 서버 내부 표준형으로 정규화/검증.
+// ai-generate.js 출력({ body, choices, answerIndex, explanation, evidence }) 및
+// 유사 형태(answer_index)도 수용한다.
+function normalizeQuestion(raw, idx) {
+  if (!raw || typeof raw !== 'object') return null;
+  const body = String(raw.body || '').trim();
+  const choices = Array.isArray(raw.choices) ? raw.choices.map((c) => String(c)) : [];
+  const answerIndex = Number.isInteger(raw.answerIndex)
+    ? raw.answerIndex
+    : Number(raw.answer_index);
+  const explanation = String(raw.explanation || '').trim();
+  if (body.length < 1) return null;
+  if (choices.length < 2 || choices.some((c) => !c)) return null;
+  if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= choices.length) return null;
+  return {
+    id: String(raw.id || `q${idx + 1}`),
+    concept: raw.concept ? String(raw.concept) : null,
+    difficulty: Number.isInteger(raw.difficulty) ? raw.difficulty : null,
+    body,
+    choices,
+    answerIndex,
+    explanation,
+    evidence: raw.evidence && typeof raw.evidence === 'object'
+      ? { page: Number(raw.evidence.page) || null, quote: String(raw.evidence.quote || '') }
+      : null,
+    qtype: 'choice'
+  };
+}
+
+/**
+ * 생성된 문제 세트를 저장. payload: { title?, courseId?, source?, questions:[...] }
+ * 반환: { setId, title, courseId, source, questionCount, createdAt }
+ */
+function saveQuestionSet(payload = {}) {
+  const rawList = Array.isArray(payload.questions) ? payload.questions : [];
+  if (!rawList.length) {
+    const err = new Error('저장할 문제가 없습니다.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const questions = rawList.map(normalizeQuestion).filter(Boolean);
+  if (questions.length !== rawList.length) {
+    const err = new Error('문제 형식이 올바르지 않은 항목이 있습니다.');
+    err.statusCode = 400;
+    err.code = 'invalid_question';
+    throw err;
+  }
+  // 세트 내 문항 id 중복 제거(동일 id면 뒤에 번호 부여)
+  const seen = new Set();
+  questions.forEach((q, i) => {
+    if (seen.has(q.id)) q.id = `${q.id}-${i + 1}`;
+    seen.add(q.id);
+  });
+
+  const setId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const record = {
+    setId,
+    title: String(payload.title || '교안 문제 세트').slice(0, 120),
+    courseId: payload.courseId ? String(payload.courseId) : COURSE.id,
+    source: payload.source ? String(payload.source) : 'generated',
+    createdAt,
+    questions
+  };
+
+  const map = readSets();
+  map[setId] = record;
+  writeSets(map);
+
+  return {
+    setId,
+    title: record.title,
+    courseId: record.courseId,
+    source: record.source,
+    questionCount: questions.length,
+    createdAt
+  };
+}
+
+/** 저장된 세트 조회(정답 포함, 서버 내부용). */
+function getQuestionSet(setId) {
+  const map = readSets();
+  return map[setId] || null;
+}
+
+/**
+ * 저장된 문제 세트로 attempt를 생성. 정답/해설은 응답에서 제외한다.
+ */
+function createAttemptFromSet(setId, userId = 'anonymous') {
+  const set = getQuestionSet(setId);
+  if (!set) {
+    const err = new Error('존재하지 않는 문제 세트입니다.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const attemptId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+
+  const map = readAttempts();
+  map[attemptId] = {
+    attemptId,
+    setId,
+    stageId: null,
+    userId: String(userId || 'anonymous'),
+    examId: `set:${setId}`,
+    examVersion: 1,
+    // 정답 포함 문항을 attempt에 저장 → gradeAttempt가 이 items로 채점
+    items: set.questions,
+    questionIds: set.questions.map((q) => q.id),
+    createdAt,
+    graded: false,
+    result: null
+  };
+  writeAttempts(map);
+
+  const questions = set.questions.map((q) => ({
+    id: q.id,
+    concept: q.concept,
+    difficulty: q.difficulty,
+    body: q.body,
+    choices: q.choices,
+    qtype: q.qtype
+  }));
+
+  return {
+    attemptId,
+    setId,
+    examId: `set:${setId}`,
+    examVersion: 1,
+    title: set.title,
+    questionCount: questions.length,
+    questions
+  };
+}
+
 // ----- 출제 -----
 /**
  * 스테이지 출제: attempt를 생성하고 정답/해설을 제외한 문제를 반환.
@@ -165,11 +326,17 @@ function gradeAttempt(attemptId, answers) {
     throw err;
   }
 
-  const items = attempt.questionIds.map(getBankQuestion);
-  if (items.some((q) => !q)) {
-    const err = new Error('시험지 문항을 찾을 수 없습니다.');
-    err.statusCode = 500;
-    throw err;
+  // 문항 소스: 커스텀 세트(attempt.items)가 있으면 우선 사용, 없으면 기본 뱅크.
+  let items;
+  if (Array.isArray(attempt.items) && attempt.items.length) {
+    items = attempt.items;
+  } else {
+    items = attempt.questionIds.map(getBankQuestion);
+    if (items.some((q) => !q)) {
+      const err = new Error('시험지 문항을 찾을 수 없습니다.');
+      err.statusCode = 500;
+      throw err;
+    }
   }
 
   const safeAnswers = answers && typeof answers === 'object' ? answers : {};
@@ -246,6 +413,9 @@ function stageUnit(stageId) {
 
 module.exports = {
   createAttempt,
+  createAttemptFromSet,
+  saveQuestionSet,
+  getQuestionSet,
   gradeAttempt,
   listStages,
   stageOrder,

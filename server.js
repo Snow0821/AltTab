@@ -291,6 +291,32 @@ app.post('/api/attempts/:attemptId/answers', (req, res) => {
   }
 });
 
+// ===== 생성 문제 세트 저장 / 세트로 출제 =====
+// 팀원의 /api/generate(ai-generate.js)로 만든 문제를 저장하고, 그 세트로 풀이를 연결한다.
+
+// 세트 저장: POST /api/question-sets  { title?, courseId?, source?, questions:[...] }
+app.post('/api/question-sets', (req, res) => {
+  try {
+    const summary = exam.saveQuestionSet(req.body || {});
+    res.status(201).json({ ok: true, ...summary });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
+// 저장 세트로 출제: POST /api/question-sets/:setId/attempts  { userId? }
+app.post('/api/question-sets/:setId/attempts', (req, res) => {
+  try {
+    const userId = (req.body && req.body.userId) || 'anonymous';
+    const attempt = exam.createAttemptFromSet(req.params.setId, userId);
+    res.status(201).json({ ok: true, ...attempt });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`passfinder MVP server running on http://localhost:${PORT}`);
   console.log(`[scores] 저장 모드: ${scores.getMode()}`);
