@@ -70,5 +70,7 @@ test('generation validates range and source evidence; provider errors cannot exp
   assert.equal(JSON.stringify(data).includes('private-test-key'), false);
   generated[0].evidence.quote = '교안에 없는 근거 문장이니 거부해야 합니다.';
   await assert.rejects(ai.generate(source, { env: { KOOKMIN_KEY: 'private-test-key' }, fetchImpl }), /근거/);
+  await assert.rejects(ai.generate(source, { env: { KOOKMIN_KEY: 'private-test-key' }, fetchImpl: async () => Response.json({ stop_reason: 'max_tokens', content: [] }) }), /도중에 멈췄어요/);
+  await assert.rejects(ai.generate(source, { env: { KOOKMIN_KEY: 'private-test-key' }, fetchImpl: async () => Response.json({ content: [{ type: 'text', text: 'invalid private-test-key' }] }) }), error => error.status === 422 && /형식/.test(error.message) && !error.message.includes('private-test-key'));
   await assert.rejects(ai.generate(source, { env: { KOOKMIN_KEY: 'private-test-key' }, fetchImpl: async () => new Response('private-test-key', { status: 401 }) }), error => error.status === 502 && !error.message.includes('private-test-key'));
 });
