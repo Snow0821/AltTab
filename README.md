@@ -17,6 +17,6 @@ Node.js(`>=18`)를 지원하는 플랫폼(Render, Railway 등)에 `npm install &
 
 ## 협업 안내
 
-작업 전 [협업 가이드](CONTRIBUTING.md)를 확인해 주세요. 작업별 브랜치에서 변경하고 PR로 제출하며, Mint가 검토를 통과한 PR을 병합합니다.
+**최신 작업 방식 (2026-10-03): 각 팀원과 AI가 최신 `main`을 동기화한 뒤 직접 일반 push합니다. PR 제출과 Mint의 사전 검토·승인은 필수가 아닙니다.**
 
-AI 도구는 [AGENTS.md](AGENTS.md)도 따라야 합니다. Snow0821 계정을 사용하는 경우에도 Mint 외 모든 AI는 별도 PR을 제출합니다.
+작업 전 [협업 가이드](CONTRIBUTING.md)를 확인하고, 다른 사람의 작업을 보존하세요. AI 도구는 [AGENTS.md](AGENTS.md)도 따릅니다. 이 안내가 과거의 필수 PR·검토 절차보다 우선합니다.
