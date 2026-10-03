@@ -70,7 +70,9 @@ JSDOM_MODULE=/tmp/alttab-ui-testdeps/node_modules/jsdom/lib/api.js \
 - 신규 DOM 테스트 4개: DB 다음 LLM 순서, 연타 방지, HTML을 텍스트로 출력, 입력 보존/실패, 키 없음/종료, LLM 실패 자동 재시도 없음
 - 기존 시험 화면 도메인/HTTP/DOM 테스트 14개. 병렬 실행에서 기존 12ms hash-navigation 테스트 1건이 타이밍 실패했으며 순차 재실행은 모두 통과했다.
 - 실제 Supabase 연결 도구 경로에서 테스트 문장 저장/읽기 정확 일치 확인, RLS 활성화/정책 0개/익명 조회 0행 확인
-- Vercel 런타임의 환경 변수/DB REST 저장 및 실제 LLM 응답은 별도 확인 대상. 위 단위 테스트의 provider stub은 실호출 성공 증거가 아니다.
+- 2026-10-03 15:01 KST: [배포된 /mock/](https://alt-tab-mu.vercel.app/mock/)에서 서버 키 존재와 실제 DB 저장·별도 읽기·값 정확 일치를 확인했다. `AltTab Vercel DB 테스트 2026-10-03` 입력과 DB 직접 조회가 일치했으며 클라우드 브라우저 화면도 확인했다. 구현 커밋 `ec458ca`의 Vercel 상태는 success다.
+- LLM은 실제 학교 요금 상한을 확인하지 못해 미실행이다. 15:01 KST에 전역 1회 호출권이 미사용임을 확인했다. 단위 테스트의 provider stub은 실호출 성공 증거가 아니다.
+- 전체 순차 테스트 29개 통과. Preview/Development 설정과 다른 앱 기능의 DB 전환은 이 검증에 포함하지 않는다.
 
 공식 프로토콜: [학교 AI](https://ai.cs.kookmin.ac.kr/), [학교가 연결한 New API Messages 문서](https://docs.newapi.pro/en/docs/api/ai-model/chat/createmessage).
 
