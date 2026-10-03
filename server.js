@@ -15,6 +15,9 @@ require('./connection-check')(app);
 // Public, fixed-allowlist database viewer. No writes or generic DB access.
 require('./admin-viewer')(app);
 
+// Minimal shared exams and server-graded rankings, isolated from the legacy UI.
+require('./v2')(app);
+
 // FR-12 교안으로 문제 만들기 API. 고른 쪽의 글자를 받으므로 기본 100KB보다 큰 본문을 허용한다.
 app.use('/api/generate', express.json({ limit: '600kb' }));
 require('./ai-generate')(app);
