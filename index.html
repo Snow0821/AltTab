@@ -9,6 +9,11 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:16px}
 button,input{font:inherit}
+.study-frame{display:block;width:100%;height:calc(100dvh - 100px);min-height:640px;border:1px solid var(--line);border-radius:16px;background:white}
+body.study-view main{max-width:none;margin:16px auto;padding:0 16px}
+body.study-view footer{display:none}
+nav{overflow-x:auto;white-space:nowrap}
+nav button[aria-current="page"]{color:var(--blue);background:#edf2ff}
 button{cursor:pointer;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink);padding:12px 18px;font-weight:700}
 button:hover{filter:brightness(.96)}
 button:focus-visible,a:focus-visible{outline:3px solid #8bb2ff;outline-offset:3px}
@@ -137,7 +142,9 @@ a{color:var(--blue)}
 <header>
   <button class="logo" data-page="home">PassFinder</button>
   <nav>
-    <button data-page="home">내 과목</button>
+    <button data-page="study">학습 공간</button>
+    <button data-page="make">AI 문제 만들기</button>
+    <button data-page="home">학습맵 데모</button>
     <button data-page="review">복습</button>
     <button data-page="payment">이용권</button>
   </nav>
@@ -156,7 +163,9 @@ a{color:var(--blue)}
 <script>
 const $ = s => document.querySelector(s);
 
-let page = 'home';
+let page = 'study';
+// Use the deployed workspace and its existing assets; avoid duplicating its state or grading logic.
+const studyBase = location.protocol === 'file:' ? './public/exam-workspace/' : '/study/';
 let course = '운영체제';
 let selected = -1;
 let submitted = false;
@@ -287,7 +296,13 @@ function go(p) {
 function render() {
   let html = '';
 
-  if (page === 'home') {
+  if (page === 'study' || page === 'make') {
+    const src = studyBase + (page === 'make' ? 'make.html' : '');
+    html = `<iframe class="study-frame" src="${src}" title="${page === 'make' ? '교안으로 AI 문제 만들기' : 'PassFinder 학습 공간'}"></iframe>
+      <p class="demo"><a href="${src}">학습 화면을 전체 창으로 열기 →</a></p>`;
+  }
+
+  else if (page === 'home') {
     html = `
       <div class="row between">
         <div>
@@ -659,6 +674,11 @@ function render() {
     html = `<div class="content">${paymentHTML()}</div>`;
   }
 
+  document.body.classList.toggle('study-view', page === 'study' || page === 'make');
+  document.querySelectorAll('header [data-page]').forEach(b => {
+    if (b.dataset.page === page) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
   $('#app').innerHTML = html;
 
   if (page === 'materials') {
