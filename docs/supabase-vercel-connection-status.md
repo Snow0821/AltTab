@@ -1,6 +1,8 @@
 # AltTab Supabase와 Vercel 연결 점검
 
-확인 시각: 2026년 10월 3일 13:49 KST
+문서 갱신 시각: 2026년 10월 3일 14:00 KST
+
+DB 테스트 시각: 2026년 10월 3일 13:46 KST
 
 ## 현재 결론
 
@@ -12,8 +14,8 @@
 
 | 항목 | 상태 | 확인 내용 |
 | --- | --- | --- |
-| Vercel 팀 | 확인 | Snow's projects 팀을 조회했습니다 |
-| Vercel 대상 프로젝트 | 확인 필요 | 요청 대상은 alt-tab이며, 실제 프로젝트 설정과 배포 연결은 확인하지 못했습니다 |
+| Vercel 팀 | 확인 | Vercel 팀 조회를 완료했습니다 |
+| Vercel 대상 프로젝트 | 일부 확인 | PR #9의 Vercel 봇 댓글에서 alt-tab 프로젝트와 자동 Preview Ready 상태를 확인했습니다. 실제 설정과 런타임 연결은 미확인입니다 |
 | 새 Supabase 프로젝트 | 확인 | 사용자가 제공한 프로젝트를 직접 조회해 이름 AltTab과 ACTIVE_HEALTHY 상태를 확인했습니다 |
 | DB 리전과 버전 | 확인 | Tokyo ap-northeast-1, PostgreSQL 17.11 |
 | public 스키마 테이블 | 확인 | 테이블 목록이 비어 있습니다 |
@@ -59,8 +61,9 @@ Production, Preview, Development별 설정 여부를 각각 기록해야 합니�
 ## 이번 점검에서 실행하지 않은 작업
 
 - db:check는 계정과 데이터를 만들고 삭제하며 실패 주입용 트리거와 함수를 변경하므로 실행하지 않았습니다
-- DB 마이그레이션, RLS 변경, 권한 확대, 키 복사 또는 등록, 신규 DB 생성, 배포를 수행하지 않았습니다
-- KOOKMIN_KEY를 사용하는 외부 API 호출을 실행하지 않았습니다
+- DB 마이그레이션, RLS 변경, 권한 확대, 키 복사 또는 등록, 신규 DB 생성, 수동 배포를 수행하지 않았습니다
+- 문서 브랜치 공개 후 기존 Vercel GitHub 연동이 자동으로 Preview를 생성했습니다. Ready 표시는 배포 상태이며 DB나 LLM 연결 성공의 증거는 아닙니다
+- KOOKMIN_KEY를 사용하는 외부 API 호출은 미실행이며 후속 점검으로 남겨둡니다. 이번 문서는 Supabase 연결 결과를 먼저 공유합니다
 
 ## 점검 기록
 
@@ -75,8 +78,11 @@ Production, Preview, Development별 설정 여부를 각각 기록해야 합니�
 | 2026-10-03 13:46 KST | public 스키마 테이블 및 마이그레이션 목록 | 두 목록 모두 비어 있었습니다 |
 | 2026-10-03 13:49 KST | GitHub main 및 PR #4 최신 커밋의 코드 재확인 | main은 Express MVP, PR #4는 Draft. Supabase 변수 이름과 임베딩 변수 불일치가 그대로 확인됐습니다 |
 
+| 2026-10-03 13:55 KST | 문서 브랜치의 Vercel 자동 Preview | 공식 봇 댓글에서 Ready 확인. DB·LLM 런타임 테스트는 미실행 |
+
 ## 참고 자료
 
+- [PR #9 Vercel Preview 상태](https://github.com/Snow0821/AltTab/pull/9#issuecomment-5965733439)
 - [Supabase의 Vercel 연결 안내](https://supabase.com/partners/vercel)
 - [Vercel Supabase 통합](https://vercel.com/marketplace/supabase/supabase)
 - [Supabase Vercel Marketplace 문서](https://supabase.com/docs/guides/integrations/vercel-marketplace)
