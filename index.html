@@ -1,1 +1,1051 @@
-Hello  Worlds
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PassFinder</title>
+<style>
+:root{--blue:#1762ff;--ink:#111d42;--muted:#76819a;--line:#e5eaf2;--green:#13b579;--bg:#f7f9fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:16px}
+button,input{font:inherit}
+button{cursor:pointer;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink);padding:12px 18px;font-weight:700}
+button:hover{filter:brightness(.96)}
+button:focus-visible,a:focus-visible{outline:3px solid #8bb2ff;outline-offset:3px}
+button:disabled{cursor:default;opacity:.5}
+.primary{background:var(--blue);color:white;border-color:var(--blue)}
+.outline{color:var(--blue);border-color:#b6ceff}
+.wide{width:100%}
+.small{font-size:13px;padding:8px 12px}
+header{height:80px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 1180px)/2));gap:32px}
+.logo{font-size:28px;font-weight:900;color:var(--blue);letter-spacing:-1px;background:none;border:0;padding:0}
+nav{display:flex;gap:12px;flex:1}
+nav button{border:0;color:var(--muted);background:none}
+.avatar{background:#e9efff;width:40px;height:40px;display:grid;place-items:center;border-radius:50%;color:var(--blue);font-weight:700}
+main{max-width:1180px;margin:42px auto;padding:0 24px}
+h1{font-size:34px;letter-spacing:-1px;margin:0 0 12px}
+h2{font-size:24px;margin:0 0 12px}
+h3{font-size:19px;margin:0 0 8px}
+p{line-height:1.6}
+.muted{color:var(--muted)}
+.row{display:flex;align-items:center;gap:14px}
+.between{justify-content:space-between}
+.grid{display:grid;gap:22px}
+.three{grid-template-columns:repeat(3,1fr)}
+.two{grid-template-columns:1fr 1fr}
+.card{background:white;border:1px solid var(--line);border-radius:16px;padding:26px;box-shadow:0 4px 20px #14275003}
+.badge{font-size:13px;border-radius:6px;padding:5px 9px;display:inline-block;background:#edf2ff;color:var(--blue);font-weight:700}
+.green{background:#e4f8ef;color:#169766}
+.amber{background:#fff1d9;color:#a86c0c}
+.red{background:#fff0f0;color:#eb5b6b}
+.progress{height:9px;border-radius:10px;background:#e8ebf0;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--blue);border-radius:10px;transition:width .3s}
+.course{display:flex;flex-direction:column;gap:18px;min-height:310px}
+.course-icon{font-size:30px;color:var(--blue);background:#edf3ff;width:66px;height:66px;border-radius:14px;display:grid;place-items:center}
+.course h2{font-size:23px}
+.course button{margin-top:auto}
+.subtitle{margin:0 0 28px;color:var(--muted)}
+.spacer{height:24px}
+.tabs{display:flex;border-bottom:1px solid var(--line);margin:28px 0}
+.tabs button{flex:1;border-radius:0;border:0;background:none;color:var(--muted)}
+.tabs button.active{border-bottom:3px solid var(--blue);color:var(--blue)}
+.page-title{display:flex;gap:14px;align-items:center}
+.back{background:none;border:0;padding:4px;font-size:25px}
+.content{max-width:900px;margin:auto}
+.drop{border:1.5px dashed #bbcae0;border-radius:12px;padding:30px;text-align:center;background:#fafcff}
+.file{padding:18px;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;gap:12px;margin-top:16px}
+.file-name{flex:1;overflow-wrap:anywhere}
+.claude{font-size:36px;color:#d36a46}
+.stats{display:flex;gap:18px;flex-wrap:wrap}
+.stats .card{flex:1;padding:20px;background:#f1f6ff}
+.map{margin-top:24px}
+.unit{padding:28px}
+.stage-list{position:relative;margin-top:26px}
+.stage-list:before{content:'';position:absolute;left:27px;top:25px;bottom:45px;width:4px;background:#e0e6f0}
+.stage{position:relative;display:flex;align-items:center;gap:18px;min-height:98px;padding:16px 0}
+.node{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#e5e9f0;color:#929caf;flex-shrink:0;border:6px solid white;font-weight:800;font-size:22px;z-index:1}
+.stage.done .node{background:var(--green);color:white}
+.stage.review .node{background:#ffba42;color:#895000}
+.stage.current{background:#edf4ff;border-radius:12px;padding-right:16px}
+.stage.current .node{background:var(--blue);color:white;box-shadow:0 0 0 4px #d6e5ff}
+.stage-body{flex:1}
+.stage-body p{font-size:14px;margin:5px 0 0;color:var(--muted)}
+.stars{color:#ffb92e;font-size:25px;letter-spacing:3px;white-space:nowrap}
+.locked{color:#9099ab}
+.quiz{max-width:760px;margin:auto}
+.options{display:grid;gap:14px;margin:28px 0}
+.option{text-align:left;padding:19px;border-radius:11px;font-weight:500}
+.option.selected{background:#edf4ff;border-color:var(--blue);color:var(--blue)}
+.option.correct{background:#eaf9f1;border-color:var(--green);color:#15815c}
+.option.wrong{background:#fff0f0;border-color:#e56b76}
+.feedback{background:#e9f8ef;border:1px solid #bfe8d2;padding:22px;border-radius:12px;margin-bottom:22px}
+.result{text-align:center;max-width:760px;margin:auto}
+.check{width:80px;height:80px;background:var(--green);color:white;display:grid;place-items:center;border-radius:50%;font-size:42px;margin:12px auto 24px}
+.result .stars{font-size:42px}
+.reward{background:#f6f9ff;padding:22px;border-radius:12px}
+.reward b{font-size:25px;display:block;margin-top:10px}
+.review-row{padding:20px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:20px}
+.review-row:last-child{border:0}
+.review-row .text{flex:1}
+.plans{margin-top:22px}
+.plan{text-align:left;padding:24px;line-height:1.6}
+.plan.selected{background:#f1f6ff;border:2px solid var(--blue)}
+.plan b{display:block;font-size:23px;color:var(--blue);margin-top:14px}
+.overlay{position:fixed;inset:0;background:#17274670;backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+.overlay.open{display:flex}
+.modal{background:white;border-radius:18px;padding:30px;max-width:650px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 30px 100px #111d4240}
+.step{border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:16px}
+.number{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--blue);color:white;flex-shrink:0;font-weight:800}
+.copybox{background:#f3f6fb;border-radius:8px;padding:12px;display:flex;align-items:center;gap:10px;margin-top:14px;overflow-wrap:anywhere}
+.copybox span{flex:1;font-size:14px}
+details{margin-top:14px;color:var(--muted);font-size:14px;line-height:1.7}
+summary{cursor:pointer;color:var(--ink)}
+.notice{background:#f3f6fb;padding:18px;border-radius:10px;font-size:14px;margin-top:20px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:white;padding:14px 22px;border-radius:10px;z-index:30;display:none;max-width:90vw;text-align:center}
+.demo{font-size:12px;color:var(--muted);text-align:center;margin:28px 0}
+input[type=text],input[type=date]{width:100%;padding:13px;border:1px solid var(--line);border-radius:9px;margin:10px 0}
+label{display:block;margin-top:16px}
+a{color:var(--blue)}
+@media(max-width:700px){
+  header{padding:0 18px;gap:14px;height:68px}
+  .logo{font-size:23px}
+  nav{gap:0}
+  nav button{padding:9px;font-size:13px}
+  .avatar{display:none}
+  main{margin:28px auto;padding:0 16px}
+  h1{font-size:27px}
+  .three,.two{grid-template-columns:1fr}
+  .card{padding:20px}
+  .course{min-height:250px}
+  .stage{gap:10px}
+  .stage-body h3{font-size:16px}
+  .stage .stars{font-size:17px}
+  .stage.current{flex-wrap:wrap}
+  .stage.current button{margin-left:76px}
+  .modal{padding:22px}
+  .copybox{flex-wrap:wrap}
+  .stats{gap:10px}
+  .review-row{gap:10px}
+  .page-title h1{font-size:25px}
+  .result .three{grid-template-columns:repeat(3,1fr);gap:8px}
+  .reward{padding:15px 6px;font-size:13px}
+  .reward b{font-size:20px}
+}
+</style>
+</head>
+<body>
+<header>
+  <button class="logo" data-page="home">PassFinder</button>
+  <nav>
+    <button data-page="home">내 과목</button>
+    <button data-page="review">복습</button>
+    <button data-page="payment">이용권</button>
+  </nav>
+  <div class="avatar">K</div>
+</header>
+
+<main id="app"></main>
+
+<div class="overlay" id="overlay">
+  <section class="modal" role="dialog" aria-modal="true"
+    aria-labelledby="modalTitle" id="modal"></section>
+</div>
+
+<div class="toast" role="status" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+let page = 'home';
+let course = '운영체제';
+let selected = -1;
+let submitted = false;
+let qIndex = 0;
+let score = 0;
+let totalXP = 420;
+let paid = false;
+let plan = 'course';
+let lastFocus = null;
+
+const stageNames = [
+  '프로세스 개념',
+  '프로세스 상태',
+  '문맥 교환',
+  '스케줄링',
+  '동기화'
+];
+
+let currentStage = 2;
+let cleared = false;
+
+let files = [
+  { name: '운영체제_1장.pdf', status: '분석 준비 완료' }
+];
+
+const questions = [
+  {
+    q: '문맥 교환이 일어날 때 저장하는 정보는?',
+    a: [
+      '프로세스의 실행 상태',
+      '모니터의 해상도',
+      '파일의 확장자',
+      '네트워크 주소'
+    ],
+    correct: 0,
+    e: '다음 실행을 이어가기 위해 레지스터와 프로그램 카운터를 저장해요.'
+  },
+  {
+    q: '프로세스의 실행 정보를 저장하는 자료구조는?',
+    a: [
+      'CPU 캐시',
+      '프로세스 제어 블록(PCB)',
+      '라우팅 테이블',
+      '파일 확장자'
+    ],
+    correct: 1,
+    e: 'PCB에는 프로세스 상태, 프로그램 카운터, CPU 레지스터 등 실행 정보가 저장됩니다.'
+  },
+  {
+    q: '문맥 교환의 비용에 대한 설명으로 옳은 것은?',
+    a: [
+      '항상 비용이 0이다',
+      '사용자 프로그램의 유용한 작업만 수행한다',
+      '상태를 저장하고 복원하는 오버헤드가 발생한다',
+      '저장 장치 용량만 증가한다'
+    ],
+    correct: 2,
+    e: '문맥 교환에 소요되는 시간은 프로세스의 실제 작업을 수행하지 않는 오버헤드입니다.'
+  },
+  {
+    q: '프로그램 카운터는 어떤 정보를 나타내나요?',
+    a: [
+      '파일 크기',
+      '화면 크기',
+      '프로세스의 이름',
+      '다음에 실행할 명령어의 주소'
+    ],
+    correct: 3,
+    e: '프로그램 카운터는 다음에 실행할 명령어의 주소를 나타냅니다.'
+  },
+  {
+    q: '실행 중인 프로세스가 입출력을 요청하면 일반적으로 어떤 상태로 바뀌나요?',
+    a: [
+      '대기 상태',
+      '종료 상태',
+      '생성 상태',
+      '항상 실행 상태 유지'
+    ],
+    correct: 0,
+    e: '입출력 작업이 완료될 때까지 프로세스는 대기 상태에 머뭅니다.'
+  }
+];
+
+const progress = (n = 40) => `
+  <div class="progress">
+    <i style="width:${n}%"></i>
+  </div>
+`;
+
+const tabs = active => `
+  <div class="tabs">
+    <button data-page="map"
+      class="${active === 'map' ? 'active' : ''}">
+      학습맵
+    </button>
+    <button data-page="materials"
+      class="${active === 'materials' ? 'active' : ''}">
+      교안 · AI 연결
+    </button>
+  </div>
+`;
+
+const title = () => `
+  <div class="page-title">
+    <button class="back" data-page="home"
+      aria-label="내 과목으로">←</button>
+    <h1 style="margin:0">${escapeHTML(course)}</h1>
+    <span class="badge red">D-7</span>
+  </div>
+`;
+
+function escapeHTML(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+}
+
+function go(p) {
+  page = p;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  let html = '';
+
+  if (page === 'home') {
+    html = `
+      <div class="row between">
+        <div>
+          <h1>이번 시험, 한 단계씩</h1>
+          <p class="subtitle">교안을 올리고 학습을 시작하세요.</p>
+        </div>
+        <button class="primary" onclick="newCourse()">
+          + 새 과목
+        </button>
+      </div>
+
+      <div class="grid three">
+        ${['운영체제 중간고사', '자료구조', '컴퓨터네트워크']
+          .map((c, i) => `
+          <article class="card course">
+            <div class="row between">
+              <span class="badge ${i === 0 ? 'green' : ''}">
+                ${i === 0 ? '이용 중' : i === 2 ? '새 과목' : '학습 중'}
+              </span>
+              ${i < 2 ? `
+                <span class="badge red">D-${i === 0 ? 7 : 12}</span>
+              ` : ''}
+            </div>
+
+            <div class="course-icon">${['▣', '{ }', '◎'][i]}</div>
+            <h2>${c}</h2>
+
+            <span class="muted">
+              ${i === 2
+                ? '교안을 업로드하고 학습을 시작하세요.'
+                : `개념 ${i === 0 ? 15 : 12}개 · ${i === 0 ? 30 : 24}문항`}
+            </span>
+
+            ${i < 2 ? `
+              <div>진행률 <b>${i === 0 ? 40 : 20}%</b></div>
+              ${progress(i === 0 ? 40 : 20)}
+            ` : ''}
+
+            <button class="${i === 2 ? 'outline' : 'primary'}"
+              onclick="openCourse(${i})">
+              ${i === 2 ? '교안 올리기' : '이어서 학습'}
+            </button>
+          </article>
+        `).join('')}
+      </div>
+
+      <div class="card row between" style="margin-top:24px">
+        <div style="flex:1">
+          <h3>◎ 오늘의 학습 목표</h3>
+          <p><b>30</b> / 50 XP</p>
+          ${progress(60)}
+        </div>
+        <div>
+          <h3>🔥 3일 연속 학습</h3>
+          <span class="muted">지금도 좋은 페이스예요!</span>
+        </div>
+      </div>
+    `;
+  }
+
+  else if (page === 'materials') {
+    html = `
+      <div class="content">
+        ${title()}
+        ${tabs('materials')}
+
+        <section class="card">
+          <h2>1. 교안 업로드</h2>
+          <p class="muted">
+            교안 PDF를 올리고 Claude로 개념과 문제를 준비하세요.
+          </p>
+
+          <div class="drop" id="drop">
+            <h3>▧ PDF를 끌어 놓거나 선택하세요</h3>
+            <p class="muted">PDF · 최대 50MB · 최대 20개</p>
+            <button class="outline"
+              onclick="$('#fileInput').click()">파일 선택</button>
+            <input id="fileInput" type="file"
+              accept="application/pdf,.pdf" hidden multiple>
+          </div>
+
+          ${files.map(f => `
+            <div class="file">
+              <span style="color:#eb6575;font-size:25px">▧</span>
+              <span class="file-name">${escapeHTML(f.name)}</span>
+              <span class="badge green">${f.status}</span>
+            </div>
+          `).join('')}
+
+          <p class="muted" style="font-size:13px">
+            데모: 파일명만 표시하며 서버 업로드·PDF 분석은 연결되지 않았어요.
+          </p>
+        </section>
+
+        <div class="card row between" style="margin-top:20px">
+          <div class="row">
+            <span class="claude">✳</span>
+            <div>
+              <h3>Claude 연결</h3>
+              <span class="muted">
+                내 AI로 개념과 문제를 준비하세요.
+              </span>
+            </div>
+          </div>
+
+          <div style="text-align:right">
+            <span class="badge red">미연결</span><br>
+            <button class="outline small" style="margin-top:10px"
+              onclick="manual()">연결 방법 보기</button>
+          </div>
+        </div>
+
+        <div class="stats" style="margin-top:20px">
+          <div class="card">개념 <h2>15개</h2></div>
+          <div class="card">검증 완료 <h2>30문항</h2></div>
+        </div>
+      </div>
+    `;
+  }
+
+  else if (page === 'map') {
+    html = `
+      <div class="content">
+        ${title()}
+        ${tabs('map')}
+
+        <div class="card">
+          <div class="row between">
+            <b>전체 진행률 ${cleared ? '7' : '6'} / 15</b>
+            <b style="color:var(--blue)">★ ${totalXP} XP</b>
+          </div>
+          <div class="spacer"></div>
+          ${progress(cleared ? 47 : 40)}
+
+          <div class="row between" style="margin-top:16px">
+            <span class="muted">${cleared ? '47' : '40'}% 완료</span>
+            <span class="badge">D-7 · 오늘 권장 2개</span>
+          </div>
+        </div>
+
+        <section class="card unit map">
+          <h2>유닛 2 · 프로세스</h2>
+          <p class="muted">
+            프로세스의 개념과 상태, 문맥 교환, 스케줄링을 학습합니다.
+          </p>
+
+          <div class="stage-list">
+            ${stageNames.map((s, i) => `
+              <div class="stage ${
+                i < currentStage
+                  ? (i === 1 ? 'review' : 'done')
+                  : i === currentStage ? 'current' : 'locked'
+              }">
+                <button class="node" onclick="stageClick(${i})"
+                  aria-label="${s}">
+                  ${i < currentStage
+                    ? (i === 1 ? '2' : '✓')
+                    : i === currentStage ? i + 1 : '⌑'}
+                </button>
+
+                <div class="stage-body">
+                  <h3>
+                    ${s}
+                    ${i === 1
+                      ? '<span class="badge amber">복습 필요</span>'
+                      : ''}
+                  </h3>
+                  <p>${[
+                    '프로세스의 정의와 구성 요소',
+                    '프로세스의 상태 변화',
+                    '실행 정보를 저장하고 복원하기',
+                    'CPU 스케줄링 알고리즘',
+                    '여러 프로세스의 협력'
+                  ][i]}</p>
+                </div>
+
+                ${i < currentStage ? `
+                  <span class="stars">${i === 0 ? '★★☆' : '★☆☆'}</span>
+                ` : i === currentStage ? `
+                  <button class="primary" onclick="startQuiz()">
+                    학습 시작
+                  </button>
+                ` : '<span>🔒</span>'}
+              </div>
+            `).join('')}
+          </div>
+        </section>
+
+        <div class="card row between" style="margin-top:20px">
+          <div>
+            <h3>다음 유닛 · AI 검수 필요 8문항</h3>
+            <span class="muted">
+              다른 학생의 AI 검수가 끝나면 열려요.
+            </span>
+          </div>
+          <button class="outline small"
+            onclick="copyText('PassFinder 운영체제 유닛 3 검수해 줘.')">
+            검수 요청 문구 복사
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  else if (page === 'quiz') {
+    const q = questions[qIndex];
+
+    html = `
+      <section class="card quiz">
+        <div class="row between">
+          <button class="back" data-page="map">←</button>
+          <h3 style="flex:1;margin:0">
+            ${stageNames[currentStage]}
+            <span class="badge">★ 기초</span>
+          </h3>
+          <b>${qIndex + 1} / 5</b>
+        </div>
+
+        <div class="spacer"></div>
+        ${progress((qIndex + 1) * 20)}
+        <h2 style="margin-top:32px">Q. ${q.q}</h2>
+
+        <div class="options">
+          ${q.a.map((a, i) => `
+            <button class="option
+              ${selected === i ? 'selected' : ''}
+              ${submitted && i === q.correct ? 'correct' : ''}
+              ${submitted && selected === i && i !== q.correct ? 'wrong' : ''}"
+              onclick="choose(${i})" ${submitted ? 'disabled' : ''}>
+              ${selected === i ? '◉' : '○'} &nbsp; ${a}
+            </button>
+          `).join('')}
+        </div>
+
+        ${submitted ? `
+          <div class="feedback" style="${
+            selected !== q.correct
+              ? 'background:#fff3ed;border-color:#f2d6bd'
+              : ''
+          }">
+            <h3>${selected === q.correct
+              ? '✓ 정답이에요! +10 XP'
+              : '다시 확인해 볼까요?'}</h3>
+            <p>${q.e}</p>
+            <span class="muted">예시 교안 p.12 · 데모 문제</span>
+          </div>
+        ` : ''}
+
+        <div class="row between">
+          <button class="small" onclick="report()">⚑ 문제 신고</button>
+          <span class="muted">
+            불이익 없이 다시 도전할 수 있어요.
+          </span>
+        </div>
+
+        <button class="primary wide" style="margin-top:20px"
+          onclick="${submitted ? 'nextQuestion()' : 'submitAnswer()'}"
+          ${!submitted && selected < 0 ? 'disabled' : ''}>
+          ${submitted
+            ? (qIndex === 4 ? '결과 보기' : '다음 문제 →')
+            : '정답 확인'}
+        </button>
+      </section>
+    `;
+  }
+
+  else if (page === 'result') {
+    const success = score >= 4;
+
+    html = `
+      <section class="card result">
+        <div class="check"
+          style="${!success ? 'background:#ffbc48' : ''}">
+          ${success ? '✓' : '↻'}
+        </div>
+
+        <h1>${success
+          ? '스테이지 클리어!'
+          : '한 번 더 도전해 봐요'}</h1>
+
+        <p>5문제 중 ${score}문제 정답</p>
+        <div class="stars">${success ? '★☆☆' : '☆☆☆'}</div>
+
+        <div class="grid three" style="margin:28px 0">
+          <div class="reward">
+            정답<b>+${score * 10} XP</b>
+          </div>
+          <div class="reward">
+            클리어<b>+${success ? 20 : 0} XP</b>
+          </div>
+          <div class="reward" style="background:#fff5dc">
+            획득 XP
+            <b>${score * 10 + (success ? 20 : 0) + (score === 5 ? 10 : 0)}</b>
+          </div>
+        </div>
+
+        ${score === 5
+          ? '<p class="badge green">첫 시도 만점 +10 XP</p>'
+          : ''}
+
+        <p class="row between">
+          <span>숙련도 30% → ${success ? 40 : 35}%</span>
+          <span class="green badge">+${success ? 10 : 5}%</span>
+        </p>
+
+        ${progress(success ? 40 : 35)}
+
+        <div class="notice">
+          ${success
+            ? '✓ 다음 스테이지가 열렸어요.'
+            : '벌점 없이 다시 풀 수 있어요.'}
+        </div>
+
+        <div class="row" style="margin-top:24px">
+          <button class="primary" style="flex:1"
+            onclick="${success ? "go('map')" : 'startQuiz()'}">
+            ${success ? '다음 스테이지 →' : '다시 도전'}
+          </button>
+          <button class="outline" data-page="map">학습맵으로</button>
+        </div>
+      </section>
+    `;
+  }
+
+  else if (page === 'review') {
+    html = `
+      <div class="content">
+        <h1>지금 복습할 개념</h1>
+        <p class="subtitle">
+          잊기 쉬운 개념을 다시 한 번 학습해 보세요.
+        </p>
+
+        <div class="card">
+          ${['프로세스 상태', '프로세스 개념'].map((s, i) => `
+            <div class="review-row">
+              <span class="number" style="
+                background:${i ? '#dff8ea' : '#fff1d9'};
+                color:${i ? '#159866' : '#a76b0d'}">
+                ${i ? 1 : 2}
+              </span>
+
+              <div class="text">
+                <h3>${s}</h3>
+                <span class="muted">유닛 2 · 프로세스</span>
+              </div>
+
+              <div style="width:110px">
+                <span class="muted">숙련도 ${i ? 70 : 45}%</span>
+                ${progress(i ? 70 : 45)}
+              </div>
+
+              <button class="${i ? '' : 'primary'} small"
+                onclick="${i
+                  ? "toast('내일 복습 예정이에요.')"
+                  : 'startQuiz()'}">
+                ${i ? '내일 복습' : '복습하기'}
+              </button>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="spacer"></div>
+        ${paymentHTML()}
+      </div>
+    `;
+  }
+
+  else if (page === 'payment') {
+    html = `<div class="content">${paymentHTML()}</div>`;
+  }
+
+  $('#app').innerHTML = html;
+
+  if (page === 'materials') {
+    const input = $('#fileInput');
+    input.onchange = () => addFiles(input.files);
+
+    const drop = $('#drop');
+
+    drop.ondragover = e => {
+      e.preventDefault();
+      drop.style.background = '#edf4ff';
+    };
+
+    drop.ondragleave = () => {
+      drop.style.background = '';
+    };
+
+    drop.ondrop = e => {
+      e.preventDefault();
+      drop.style.background = '';
+      addFiles(e.dataTransfer.files);
+    };
+  }
+}
+
+function paymentHTML() {
+  return `
+    <section class="card">
+      <h2>첫 유닛은 무료로 학습해요</h2>
+      <p class="muted">
+        이후에는 이용권을 구매해 모든 유닛을 학습할 수 있어요.
+      </p>
+
+      ${paid
+        ? '<p class="badge green">이용 중 · 데모 이용권 활성화</p>'
+        : ''}
+
+      <div class="grid two plans">
+        <button class="plan ${plan === 'course' ? 'selected' : ''}"
+          onclick="selectPlan('course')">
+          ${plan === 'course' ? '◉' : '○'} 과목 이용권
+          <p class="muted">
+            선택한 과목의 모든 유닛을 이용할 수 있어요.
+          </p>
+          <b>2,900원 / 과목</b>
+        </button>
+
+        <button class="plan ${plan === 'subscription' ? 'selected' : ''}"
+          onclick="selectPlan('subscription')">
+          ${plan === 'subscription' ? '◉' : '○'} 시험 기간 구독
+          <p class="muted">
+            30일 이용 · 구독 가격은 아직 미정이에요.
+          </p>
+          <b>가격 확인 필요</b>
+        </button>
+      </div>
+
+      <button class="primary wide" style="margin-top:24px"
+        onclick="pay()"
+        ${paid || plan === 'subscription' ? 'disabled' : ''}>
+        ${paid ? '이미 이용권이 있어요' : '테스트 결제'}
+      </button>
+
+      <p class="demo">실제 결제가 아닌 데모 화면입니다.</p>
+    </section>
+  `;
+}
+
+function selectPlan(p) {
+  plan = p;
+  render();
+}
+
+function pay() {
+  paid = true;
+  render();
+  toast('테스트 결제 완료! 데모 이용권이 활성화됐어요.');
+}
+
+function openCourse(i) {
+  course = ['운영체제', '자료구조', '컴퓨터네트워크'][i];
+  go(i === 2 ? 'materials' : 'map');
+}
+
+function stageClick(i) {
+  if (i > currentStage) {
+    return toast('앞 스테이지를 먼저 깨 주세요.');
+  }
+  startQuiz();
+}
+
+function startQuiz() {
+  qIndex = 0;
+  score = 0;
+  selected = -1;
+  submitted = false;
+  go('quiz');
+}
+
+function choose(i) {
+  if (submitted) return;
+  selected = i;
+  render();
+}
+
+function submitAnswer() {
+  if (selected < 0 || submitted) return;
+  submitted = true;
+
+  if (selected === questions[qIndex].correct) {
+    score++;
+  }
+
+  render();
+}
+
+function nextQuestion() {
+  if (qIndex < 4) {
+    qIndex++;
+    selected = -1;
+    submitted = false;
+    render();
+  } else {
+    if (score >= 4) {
+      cleared = true;
+      currentStage = Math.min(currentStage + 1, 4);
+    }
+
+    totalXP += score * 10
+      + (score >= 4 ? 20 : 0)
+      + (score === 5 ? 10 : 0);
+
+    go('result');
+  }
+}
+
+function addFiles(list) {
+  for (const f of list) {
+    if (!f.name.toLowerCase().endsWith('.pdf')) {
+      toast('PDF 파일만 올릴 수 있어요.');
+      continue;
+    }
+
+    if (!f.size || f.size > 50 * 1024 * 1024) {
+      toast('0바이트 또는 50MB 초과 파일은 올릴 수 없어요.');
+      continue;
+    }
+
+    if (files.length >= 20) {
+      toast('교안은 최대 20개까지 표시할 수 있어요.');
+      break;
+    }
+
+    if (files.some(x => x.name === f.name)) {
+      toast('이미 추가한 교안입니다.');
+      continue;
+    }
+
+    files.push({
+      name: f.name,
+      status: '데모 · 분석 미연결'
+    });
+  }
+
+  render();
+}
+
+function toast(t) {
+  $('#toast').textContent = t;
+  $('#toast').style.display = 'block';
+
+  clearTimeout(window.toastTimer);
+
+  window.toastTimer = setTimeout(() => {
+    $('#toast').style.display = 'none';
+  }, 3300);
+}
+
+async function copyText(t) {
+  try {
+    await navigator.clipboard.writeText(t);
+    toast('복사했어요.');
+  } catch {
+    const a = document.createElement('textarea');
+    a.value = t;
+    document.body.append(a);
+    a.select();
+
+    const ok = document.execCommand('copy');
+    a.remove();
+
+    toast(ok
+      ? '복사했어요.'
+      : '복사가 제한돼 있어요. 문구를 직접 선택해 주세요.');
+  }
+}
+
+function showModal(html) {
+  lastFocus = document.activeElement;
+  $('#modal').innerHTML = html;
+  $('#overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  $('#modal').querySelector('button')?.focus();
+}
+
+function closeModal() {
+  $('#overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  lastFocus?.focus();
+}
+
+function manual() {
+  showModal(`
+    <div class="row between">
+      <h2 id="modalTitle">Claude 연결 안내</h2>
+      <button class="back" onclick="closeModal()"
+        aria-label="닫기">×</button>
+    </div>
+
+    <p class="muted">아래 순서대로 연결해 주세요.</p>
+
+    <div class="step">
+      <div class="row">
+        <span class="number">1</span>
+        <h3 style="margin:0">MCP 주소 복사</h3>
+      </div>
+
+      <p class="muted">
+        실제 배포 시 서비스의 MCP 주소가 표시됩니다.
+      </p>
+
+      <div class="copybox">
+        <span>MCP 서버 주소 · 아직 설정되지 않음</span>
+        <button class="outline small"
+          onclick="toast('실제 MCP 서버 주소를 연결한 뒤 복사할 수 있어요.')">
+          복사
+        </button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="row">
+        <span class="number">2</span>
+        <h3 style="margin:0">Claude에서 연결</h3>
+      </div>
+
+      <p class="muted">
+        Claude의 연결 설정에 서비스의 MCP 주소를 등록하세요.
+      </p>
+
+      <details>
+        <summary>설정 위치 확인</summary>
+        <p>
+          Claude의 MCP 연결 설정에서 서비스를 등록해 주세요.
+          앱 버전에 따라 설정 위치와 원격 연결 지원 여부가 달라질 수 있어요.
+          실제 연결 안내는 배포 환경에 맞춰 제공됩니다.
+        </p>
+      </details>
+    </div>
+
+    <div class="step">
+      <div class="row">
+        <span class="number">3</span>
+        <h3 style="margin:0">학습 준비 요청</h3>
+      </div>
+
+      <p class="muted">
+        연결이 완료되면 아래 문구를 Claude에 보내세요.
+      </p>
+
+      <div class="copybox">
+        <span>
+          ${escapeHTML(course)} 교안을 읽고 개념과 문제를 만들어 줘.
+        </span>
+        <button class="outline small" onclick="copyPrompt()">
+          문구 복사
+        </button>
+      </div>
+    </div>
+
+    <div class="notice row between">
+      <span>
+        아직 연결이 확인되지 않았어요.<br>
+        <span class="muted">현재는 UI 데모예요.</span>
+      </span>
+      <button class="primary small"
+        onclick="toast('MCP 서버 미연결: 실제 연결 상태는 확인할 수 없어요.')">
+        연결 상태 확인
+      </button>
+    </div>
+  `);
+}
+
+function copyPrompt() {
+  copyText(course + ' 교안을 읽고 개념과 문제를 만들어 줘.');
+}
+
+function newCourse() {
+  showModal(`
+    <div class="row between">
+      <h2 id="modalTitle">새 과목 만들기</h2>
+      <button class="back" onclick="closeModal()">×</button>
+    </div>
+
+    <label>
+      과목 이름
+      <input id="courseName" type="text" maxlength="50"
+        placeholder="예: 운영체제 중간고사">
+    </label>
+
+    <button class="primary wide" onclick="createCourse()">
+      만들기
+    </button>
+  `);
+}
+
+function createCourse() {
+  const name = $('#courseName').value.trim();
+
+  if (!name) {
+    return toast('과목 이름을 입력해 주세요.');
+  }
+
+  course = name;
+  closeModal();
+  go('materials');
+}
+
+function report() {
+  showModal(`
+    <div class="row between">
+      <h2 id="modalTitle">문제 신고</h2>
+      <button class="back" onclick="closeModal()">×</button>
+    </div>
+
+    <p class="muted">
+      신고 사유를 선택하세요. 데모에서는 서버로 전송되지 않아요.
+    </p>
+
+    ${['정답 오류', '모호한 문항', '시험 범위 밖'].map(s => `
+      <button class="wide" style="margin-top:12px"
+        onclick="closeModal();toast('신고 선택을 확인했어요. 실제 전송은 연결되지 않았어요.')">
+        ${s}
+      </button>
+    `).join('')}
+  `);
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-page]');
+  if (b) go(b.dataset.page);
+});
+
+$('#overlay').addEventListener('click', e => {
+  if (e.target === $('#overlay')) closeModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (!$('#overlay').classList.contains('open')) return;
+
+  if (e.key === 'Escape') closeModal();
+
+  if (e.key === 'Tab') {
+    const f = [
+      ...$('#modal').querySelectorAll('button,input,summary,a')
+    ].filter(x => !x.disabled);
+
+    if (!f.length) return;
+
+    const first = f[0];
+    const last = f[f.length - 1];
+
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
+
+render();
+</script>
+
+<footer class="demo">
+  PassFinder UI 프로토타입 · Claude 연결, 분석, 결제는 데모입니다.
+</footer>
+</body>
+</html>
