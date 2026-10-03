@@ -1,4 +1,4 @@
-# CramMate(벼락치기 구조대) PRD
+# PassFinder PRD
 
 팀명: \[팀명\] | 작성일: Oct 3, 2026 · @재현씨
 
