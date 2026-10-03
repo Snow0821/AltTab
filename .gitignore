@@ -3,3 +3,5 @@ uploads/
 .env
 .env.*
 .DS_Store
+.env
+.env.*

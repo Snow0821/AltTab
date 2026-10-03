@@ -33,8 +33,14 @@ test('index is the home page, study assets serve correctly, and PDF upload flow 
     const uploadText = await uploadPage.text(); assert.match(uploadText, /교안 PDF 업로드/);
     assert.match(uploadText, /href="\/study\/make\.html"/);
     const makePage = await fetch(`${origin}/study/make.html`); assert.equal(makePage.status, 200); assert.match(await makePage.text(), /교안으로 문제 만들기/);
-    const redirect = await fetch(`${origin}/study`, { redirect: 'manual' }); assert.equal(redirect.status, 301); assert.equal(redirect.headers.get('location'), '/study/');
-    const page = await fetch(`${origin}/study/`); assert.equal(page.status, 200); assert.match(await page.text(), /샘플 데이터로 체험/);
+    const redirect = await fetch(`${origin}/study`, { redirect: 'manual' }); assert.equal(redirect.status, 302); assert.equal(redirect.headers.get('location'), '/');
+    for (const entry of ['/study/', '/study/index.html']) {
+      const response = await fetch(origin + entry);
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), homeText);
+    }
+    assert.match(homeText, /let page = 'login'/);
+    const page = await fetch(`${origin}/study/bank.html`); assert.equal(page.status, 200); assert.match(await page.text(), /샘플 데이터로 체험/);
     for (const asset of ['styles.css', 'app.mjs', 'domain.mjs', 'demo-data.mjs']) {
       const response = await fetch(`${origin}/study/${asset}`); assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type'), asset.endsWith('.css') ? /text\/css/ : /javascript/);

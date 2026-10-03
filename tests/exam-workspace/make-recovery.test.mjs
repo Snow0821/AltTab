@@ -14,7 +14,7 @@ function open(store = new Map(), { course = '', blocked = new Set() } = {}) {
       store.set(key, value);
     },
   } });
-  dom.window.eval(source.replaceAll('import.meta.url', JSON.stringify(url)).replace('export function mount', 'function mount') + '\nmount(document.getElementById("app"));');
+  dom.window.eval(source.replaceAll('import.meta.url', JSON.stringify(url)).replaceAll('export function ', 'function ') + '\nmount(document.getElementById("app"));');
   const q = selector => dom.window.document.querySelector(selector);
   return { dom, store, blocked, q, text: () => q('#app').textContent,
     answer: (id, value) => {

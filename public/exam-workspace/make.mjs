@@ -35,7 +35,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const timeText = (iso) => { try { return new Date(iso).toLocaleString('ko-KR'); } catch { return iso; } };
 
 function saveLast(showResult = false) {
-  const saved = save(KEYS.last, { key: state.setKey, mode: state.mode, playIds: state.playIds, answers: state.answers, showResult, attemptId: state.attemptId });
+  const saved = save(KEYS.last, { key: state.setKey, mode: state.mode, playIds: state.playIds, answers: state.answers, showResult, attemptId: state.attemptId, cursor: state.cursor, checked: state.checked });
   if (!saved) state.error = '답안을 이 브라우저에 저장하지 못했어요. 새로고침하면 선택한 답이 사라질 수 있어요.';
   return saved;
 }
@@ -211,6 +211,7 @@ async function generate() {
 
 function openSet(key, set, mode = 'all') {
   if (state.pending) return;
+  state.cursor = 0; state.checked = false;
   state.playIds = mode === 'review' ? ((state.setKey === key && state.result ? state.result : lastAttempt(key))?.wrongIds || []) : null;
   state.setKey = key; state.set = set; state.mode = mode; state.answers = {}; state.result = null; state.status = 'solving'; state.error = null;
   state.attemptId = null; state.storage = null; state.resultSaved = false;
@@ -230,7 +231,7 @@ function lastAttempt(key) {
 }
 
 async function submit() {
-  if (state.pending) return;
+  if (state.pending || state.status === 'result') return;
   const qs = questionsInPlay();
   if (qs.some((q) => state.answers[q.id] === undefined)) return;
   if (state.set.source !== 'sample' && state.mode === 'all') {
@@ -308,6 +309,7 @@ function render() {
 
 function renderQuiz(err) {
   const s = state; const qs = questionsInPlay(); const done = s.status === 'result';
+  if (!done && state.stageMode) return renderStep(err);
   const answered = qs.filter((q) => s.answers[q.id] !== undefined).length;
   const detail = (q) => done ? s.result.details.find((d) => d.id === q.id) : null;
   app.innerHTML = `
@@ -329,6 +331,10 @@ function renderQuiz(err) {
   app.querySelectorAll('input[type=radio]').forEach((r) => r.addEventListener('change', () => {
     s.answers[r.name] = Number(r.value); s.error = null; saveLast(); render();
   }));
+  if (courseScope && done) {
+    const back = document.createElement('button'); back.className = 'ghost'; back.textContent = '학습 단계로 돌아가기';
+    back.addEventListener('click',()=>document.dispatchEvent(new CustomEvent('pf:stage-home',{detail:{courseId:courseScope}}))); app.append(back);
+  }
   app.querySelector('#submit')?.addEventListener('click', submit);
   app.querySelector('#retry-save')?.addEventListener('click', saveRemote);
   app.querySelector('#review')?.addEventListener('click', () => openSet(s.setKey, s.set, 'review'));
@@ -343,6 +349,9 @@ function restore() {
   if (set) {
     state.setKey = last.key; state.set = set; state.mode = last.mode || 'all'; state.playIds = last.playIds || null;
     state.attemptId = last.attemptId || null;
+    state.result = null; state.answers = {};
+    state.cursor = Math.max(0, Math.min(Number(last.cursor) || 0, Math.max(0, questionsInPlay().length - 1)));
+    state.checked = !!last.checked;
     const a = last.showResult && lastAttempt(last.key);
     if (a && a.kind === state.mode) { state.result = a; state.resultSaved = true; state.status = 'result'; }
     else {
@@ -369,8 +378,65 @@ function restore() {
   }
 }
 
-export function mount(target) {
+
+export function getStages() {
+  const sets = load(KEYS.sets, {});
+  return Object.entries(sets).filter(([,set]) => set && Array.isArray(set.questions) && set.questions.length).map(([key,set],index) => {
+    const attempt = load(KEYS.attempts, []).filter(a => a.key === key && a.kind === 'all').at(-1);
+    return {key,number:index+1,title:set.title,range:set.range,count:set.questions.length,completed:!!attempt,correct:attempt?.correct,total:attempt?.total};
+  });
+}
+
+function saveStep() {
+  saveLast();
+}
+
+function renderStep(err = '') {
+  const qs = questionsInPlay();
+  if (!qs.length) { app.innerHTML = '<section class="card"><h2>복습할 문제가 없어요.</h2></section>'; return; }
+  const q = qs[state.cursor || 0];
+  const picked = state.answers[q.id];
+  const checked = !!state.checked;
+  const hasAnswer = Number.isInteger(q.answerIndex);
+  const good = picked === q.answerIndex;
+  app.innerHTML = `<section class="card step-quiz">
+    <div class="row between"><span class="badge">${state.mode === 'review' ? '오답 복습' : '단계별 학습'}</span><strong>${state.cursor+1} / ${qs.length}</strong></div>
+    <p class="muted small">${esc(state.set.title)}</p>
+    <div class="progress"><i style="width:${(state.cursor + (checked ? 1 : 0))/qs.length*100}%"></i></div>
+    <h2 style="margin:28px 0 20px">${esc(q.body)}</h2>
+    <div class="step-options">${q.choices.map((choice,i)=>`<button class="step-option ${picked === i ? 'selected' : ''} ${checked && i === q.answerIndex ? 'right' : ''} ${checked && hasAnswer && picked === i && !good ? 'wrong' : ''}" data-choice="${i}" aria-pressed="${picked===i}" ${checked || state.pending ? 'disabled' : ''}><span>${i+1}</span>${esc(choice)}</button>`).join('')}</div>
+    ${checked && hasAnswer ? `<div class="step-feedback ${good ? '' : 'incorrect'}" role="status"><h3>${good ? '정답이에요!' : '함께 확인해 볼까요?'}</h3><p>${esc(q.explanation)}</p><p class="small muted">정답: ${esc(q.choices[q.answerIndex])}</p>${q.evidence ? `<p class="small muted">근거 ${Number(q.evidence.page)}쪽 · ${esc(q.evidence.quote)}</p>` : ''}</div>` : ''}
+    ${state.pending ? '<p role="status">저장 중이에요…</p>' : ''}${err}<button id="step-action" class="primary wide" style="margin-top:24px" ${picked === undefined || state.pending ? 'disabled' : ''}>${checked ? state.cursor === qs.length-1 ? '학습 결과 보기' : '다음 문제 →' : hasAnswer ? '정답 확인' : '답 선택 완료'}</button>
+    <button id="step-back" class="ghost wide" style="margin-top:12px">학습 단계로 돌아가기</button>
+  </section>`;
+  app.querySelectorAll('[data-choice]').forEach(button=>button.addEventListener('click',()=>{
+    if (state.checked || state.pending) return;
+    state.answers[q.id] = Number(button.dataset.choice); saveStep(); renderStep();
+  }));
+  app.querySelector('#step-action').addEventListener('click',()=>{
+    if (state.pending || state.answers[q.id] === undefined) return;
+    if (!state.checked) {state.checked = true; saveStep(); renderStep();}
+    else if (state.cursor === qs.length-1) submit();
+    else {state.cursor++; state.checked = false; saveStep(); renderStep();}
+  });
+  app.querySelector('#step-back').addEventListener('click',()=>{
+    if (state.pending) return;
+    if (courseScope) document.dispatchEvent(new CustomEvent('pf:stage-home', {detail:{courseId:courseScope}}));
+    else {state.status = state.material ? 'ready' : 'idle'; render();}
+  });
+}
+
+export function mount(target, options = {}) {
   app = target;
+  if (options.stageKey) {
+    if (state.pending) return;
+    state.stageMode = true; initialized = true;
+    const last = load(KEYS.last, null);
+    if (last?.key === options.stageKey && last.mode === 'all' && !last.showResult) return restore();
+    const set = load(KEYS.sets, {})[options.stageKey];
+    if (set && Array.isArray(set.questions) && set.questions.length) return openSet(options.stageKey, set);
+    state.status = 'idle'; state.set = null;
+  }
   if (!initialized) { initialized = true; restore(); if (load('pf.participant', null)) void loadRemoteList(); } else render();
 }
 

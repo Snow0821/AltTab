@@ -26,7 +26,7 @@ function open(store = new Map([['pf.make.sets', JSON.stringify({ fixture: set })
     else throw new Error(`Unexpected request: ${url}`);
     return { ok: true, json: async () => ({ ok: true, ...body }) };
   };
-  dom.window.eval(source.replaceAll('import.meta.url', JSON.stringify('https://study.test/make.mjs')).replace('export function mount', 'function mount'));
+  dom.window.eval(source.replaceAll('import.meta.url', JSON.stringify('https://study.test/make.mjs')).replaceAll('export function ', 'function '));
   const q = s => dom.window.document.querySelector(s);
   return { dom, q, calls, store, text: () => q('#app').textContent,
     async settle() { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); },

@@ -25,7 +25,7 @@ function change(ctx, selector, value) {
   const el = ctx.q(selector); el.value = value;
   el.dispatchEvent(new ctx.window.Event('change', { bubbles: true }));
 }
-async function navigate(ctx, hash) { ctx.window.location.hash = hash; await tick(); }
+async function navigate(ctx, hash) { const changed = new Promise(resolve => ctx.window.addEventListener('hashchange', resolve, { once: true })); ctx.window.location.hash = hash; await changed; }
 async function createPaper(ctx, title = '중간고사 연습') {
   ctx.q('#pick-demo-q1').click(); ctx.q('#pick-demo-q2').click();
   input(ctx, '#paper-title', title);

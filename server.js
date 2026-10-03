@@ -80,6 +80,9 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(uploadDir, { index: false }));
 // Study screens are served independently of the main entry page.
+// All primary entry URLs open the current login-first UI. Keep the legacy bank explicit.
+app.get(['/study', '/study/', '/study/index.html'], (req, res) => res.redirect(302, '/'));
+app.get('/study/bank.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'exam-workspace', 'index.html')));
 app.use('/study', express.static(path.join(__dirname, 'public', 'exam-workspace')));
 // Serve the integrated entry at both the site root and its explicit file URL.
 app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
