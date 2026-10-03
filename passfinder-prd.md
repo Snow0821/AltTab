@@ -70,6 +70,8 @@ PassFinder는 **교안에서 연습문제를 준비하는 수고를 줄이는 �
 
 정답이 든 JSON과 응시 파일은 정적 다운로드 대상이 아니다. `/uploads`에서는 업로드 기능이 취급하는 PDF만 제공한다. `/uploads/question-sets.json`·`/uploads/attempts.json`은 파일이 존재해도 404여야 한다. 생성 세트와 응시는 이후 비공개 DB로 이전한다.
 
+다음 단계의 서버 설계·API·테이블 정의는 브랜치 `feat/common-exam-db`의 `docs/api-contract.md`와 `supabase/shared-exams.sql`에 있다(참여자 토큰 `X-Participant-Token`, 첫 완료만 집계, 작성자 제외, 300자 일반 텍스트 풀이). 테이블 적용(DB 소유자), Supabase 모드 검사, 화면 연결은 미완료다.
+
 ## 6. 운영·가격·비용
 
 운영자가 AI 공급자 비용을 내고 학생은 학습서비스 이용료를 낸다. 저장 문제의 재풀이·채점·해설·통계는 새 생성 호출 없이 처리하는 방향이다. 같은 문제 재사용은 원가를 낮출 수 있지만 실제 재사용률과 구매 전환은 검증 전 가설이다.
