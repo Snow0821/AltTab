@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +41,13 @@ test('study assets serve correctly and existing PDF upload flow is preserved', a
     const updated = await (await fetch(origin)).text(); assert.match(updated, /ui-smoke\.pdf/);
     const file = updated.match(/href="(\/uploads\/[^\"]+)"/)[1];
     assert.equal(await (await fetch(origin + file)).text(), pdf);
+    // Answer-bearing server data must stay private even when stored next to PDFs.
+    for (const name of ['question-sets.json', 'attempts.json']) {
+      await writeFile(path.join(temp, 'uploads', name), JSON.stringify({ answerIndex: 2 }));
+      for (const url of [name, name.replace('.json', '%2ejson')]) {
+        assert.equal((await fetch(`${origin}/uploads/${url}`)).status, 404);
+      }
+    }
     const invalid = new FormData(); invalid.append('pdf', new Blob(['not a pdf'], { type: 'text/plain' }), 'invalid.txt');
     assert.equal((await fetch(`${origin}/upload`, { method: 'POST', body: invalid })).status, 400);
     assert.equal((await fetch(`${origin}/upload`, { method: 'POST', body: new FormData() })).status, 400);

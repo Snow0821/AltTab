@@ -68,7 +68,11 @@ const upload = multer({
   }
 });
 
-app.use('/uploads', express.static(uploadDir, { index: false }));
+// Only uploaded PDFs are public; question sets and attempts contain private answers.
+app.use('/uploads', (req, res, next) => {
+  if (!req.path.toLowerCase().endsWith('.pdf')) return res.sendStatus(404);
+  next();
+}, express.static(uploadDir, { index: false }));
 // Isolated, sample-only exam UI. Existing upload home and data flow remain unchanged.
 app.use('/study', express.static(path.join(__dirname, 'public', 'exam-workspace')));
 
@@ -85,7 +89,7 @@ function renderPage(fileList, message) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>passfinder - 교안 업로드</title>
+<title>PassFinder - 교안 업로드</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px 16px; background: #f7f7fb; color: #1a1a1a; }
