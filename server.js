@@ -6,6 +6,7 @@ const os = require('os');
 const scores = require('./scores');
 const exam = require('./exam');
 const entitlements = require('./entitlements');
+const participants = require('./participants');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -293,40 +294,132 @@ app.post('/api/stages/:stageId/attempts', (req, res) => {
 });
 
 // 답안 제출/채점: POST /api/attempts/:attemptId/answers  { answers: { [questionId]: choiceIndex } }
-app.post('/api/attempts/:attemptId/answers', (req, res) => {
+// 공유 시험 응시는 X-Participant-Token으로 본인 확인. 스테이지 응시는 기존 그대로.
+app.post('/api/attempts/:attemptId/answers', async (req, res) => {
   try {
     const answers = (req.body && req.body.answers) || {};
-    const result = exam.gradeAttempt(req.params.attemptId, answers);
+    const result = await exam.gradeAttempt(req.params.attemptId, answers, participants.fromRequest(req));
     res.json({ ok: true, ...result });
   } catch (err) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ ok: false, error: err.message, code: err.code });
+    sendError(res, err);
   }
 });
 
-// ===== 생성 문제 세트 저장 / 세트로 출제 =====
+// ===== 생성 문제 세트 저장 / 세트로 출제 = 공유 시험 (FR-13) =====
 // 팀원의 /api/generate(ai-generate.js)로 만든 문제를 저장하고, 그 세트로 풀이를 연결한다.
+// 저장은 shared-store.js(Supabase 또는 개발용 로컬 JSON). 참가자 식별은 participants.js.
 
-// 세트 저장: POST /api/question-sets  { title?, courseId?, source?, questions:[...] }
-app.post('/api/question-sets', (req, res) => {
+function sendError(res, err) {
+  const status = err.statusCode || 500;
+  res.status(status).json({ ok: false, error: err.message, code: err.code });
+}
+
+// 참가자 세션 발급: POST /api/participants  {} → { participantId, participantToken }
+// 토큰은 브라우저가 보관하고 이후 요청의 X-Participant-Token 헤더로 보낸다.
+app.post('/api/participants', (req, res) => {
+  res.status(201).json({ ok: true, ...participants.issue() });
+});
+
+// 세트 저장: POST /api/question-sets  { title?, courseId?, source?, examId?, questions:[...] }
+// 토큰이 있으면 작성자로 기록해 집계에서 제외한다. examId를 주면 같은 시험의 새 버전(작성자만).
+app.post('/api/question-sets', async (req, res) => {
   try {
-    const summary = exam.saveQuestionSet(req.body || {});
+    const summary = await exam.saveQuestionSet(req.body || {}, { authorParticipantId: participants.fromRequest(req) });
     res.status(201).json({ ok: true, ...summary });
   } catch (err) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ ok: false, error: err.message, code: err.code });
+    sendError(res, err);
   }
 });
 
-// 저장 세트로 출제: POST /api/question-sets/:setId/attempts  { userId? }
-app.post('/api/question-sets/:setId/attempts', (req, res) => {
+// 내 시험지 목록: GET /api/question-sets  (토큰 필수) → { authored:[...], attempted:[...] }
+app.get('/api/question-sets', async (req, res) => {
   try {
-    const userId = (req.body && req.body.userId) || 'anonymous';
-    const attempt = exam.createAttemptFromSet(req.params.setId, userId);
+    const participantId = participants.requireParticipant(req);
+    res.json({ ok: true, ...(await exam.listMyExams(participantId)) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// 공유 코드로 시험 조회(정답·해설 제외): GET /api/shared-exams/:shareCode
+app.get('/api/shared-exams/:shareCode', async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await exam.getSharedExam(req.params.shareCode)) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// 저장 세트로 출제: POST /api/question-sets/:setId/attempts  { nickname? }  (토큰 필수)
+app.post('/api/question-sets/:setId/attempts', async (req, res) => {
+  try {
+    const participantId = participants.requireParticipant(req);
+    const attempt = await exam.createAttemptFromSet(req.params.setId, participantId, { nickname: req.body && req.body.nickname });
     res.status(201).json({ ok: true, ...attempt });
   } catch (err) {
-    const status = err.statusCode || 500;
-    res.status(status).json({ ok: false, error: err.message, code: err.code });
+    sendError(res, err);
+  }
+});
+
+// 공유 코드로 출제: POST /api/shared-exams/:shareCode/attempts  { nickname? }  (토큰 필수)
+app.post('/api/shared-exams/:shareCode/attempts', async (req, res) => {
+  try {
+    const participantId = participants.requireParticipant(req);
+    const attempt = await exam.createAttemptFromShareCode(req.params.shareCode, participantId, { nickname: req.body && req.body.nickname });
+    res.status(201).json({ ok: true, ...attempt });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// 재접속: 본인 응시 상태 GET /api/attempts/:attemptId  (토큰 필수) → status 'open' | 'graded'
+app.get('/api/attempts/:attemptId', async (req, res) => {
+  try {
+    const participantId = participants.requireParticipant(req);
+    res.json({ ok: true, ...(await exam.getAttemptState(req.params.attemptId, participantId)) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// ===== 참여자 결과 비교 (FR-14) =====
+// GET /api/shared-exams/:shareCode/results  (토큰 선택: 있으면 me에 내 점수·공동 순위)
+app.get('/api/shared-exams/:shareCode/results', async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await exam.getExamResults(req.params.shareCode, participants.fromRequest(req))) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// ===== 다른 참여자 풀이 참고 (FR-15) =====
+// 같은 시험을 제출한 참가자만 조회. AI 공통 해설(ai)과 학생 풀이(students, 일반 텍스트)를 구분해 돌려준다.
+app.get('/api/shared-exams/:shareCode/solutions', async (req, res) => {
+  try {
+    const participantId = participants.requireParticipant(req);
+    res.json({ ok: true, ...(await exam.listSolutions(req.params.shareCode, participantId)) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// 본인 채점 완료 응시에 풀이 저장·수정: PUT /api/attempts/:attemptId/solution  { text }  (300자 이내)
+app.put('/api/attempts/:attemptId/solution', async (req, res) => {
+  try {
+    const participantId = participants.requireParticipant(req);
+    res.json({ ok: true, ...(await exam.setSolution(req.params.attemptId, participantId, req.body && req.body.text)) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// 풀이 공유 취소: DELETE /api/attempts/:attemptId/solution
+app.delete('/api/attempts/:attemptId/solution', async (req, res) => {
+  try {
+    const participantId = participants.requireParticipant(req);
+    res.json({ ok: true, ...(await exam.clearSolution(req.params.attemptId, participantId)) });
+  } catch (err) {
+    sendError(res, err);
   }
 });
 
@@ -371,4 +464,5 @@ app.get('/api/courses/:courseId/progress', (req, res) => {
 app.listen(PORT, () => {
   console.log(`passfinder MVP server running on http://localhost:${PORT}`);
   console.log(`[scores] 저장 모드: ${scores.getMode()}`);
+  console.log(`[shared-store] 공유 시험 저장 모드: ${require('./shared-store').getMode()}`);
 });
