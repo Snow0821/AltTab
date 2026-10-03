@@ -27,6 +27,8 @@ npx next build     # 빌드
 
 데이터베이스가 준비되면 `vercel env pull .env.local` → `npm run db:apply`(스키마 적용) → `npm run db:check`(과목 생성 원자성·권한 점검) → `npm run dev` 순서로 실행한다. 이 네 단계는 아직 실행해 보지 않았다.
 
+AI 코딩 도구로 `npm run dev`를 실행하면 Next.js가 `AGENTS.md` 끝에 영어 안내 블록을 자동으로 붙인다. 팀 규칙 파일이므로 이 변경은 커밋하지 않는다(팀이 넣기로 정하면 예외).
+
 ## 파일 구조
 
 - `app/`: 화면과 API(Route Handler). `app/api/mcp/`는 MCP 서버 자리
