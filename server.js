@@ -3,9 +3,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const scores = require('./scores');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 점수 API용 JSON 바디 파서 (업로드 멀티파트와는 별개 경로에만 적용됨)
+app.use(express.json());
 
 // Vercel 서버는 코드 폴더가 읽기 전용(EROFS)이라 쓸 수 있는 임시 폴더(/tmp)에 저장한다.
 // 임시 폴더는 서버 인스턴스가 바뀌면 비워지므로 Vercel에서는 업로드가 오래 남지 않는다.
@@ -130,6 +134,80 @@ app.post('/upload', (req, res) => {
   });
 });
 
+// ===== 점수 저장 / 랭킹 (실시간) =====
+// 화면(프런트)은 별도 작업 중이므로 서버는 JSON API + SSE 스트림만 제공한다.
+
+// SSE 구독자 목록
+const rankingClients = new Set();
+
+// 현재 랭킹을 모든 SSE 구독자에게 전송
+async function broadcastLeaderboard() {
+  if (rankingClients.size === 0) return;
+  let board;
+  try {
+    board = await scores.getLeaderboard();
+  } catch (err) {
+    console.error('[ranking] 랭킹 조회 실패:', err.message);
+    return;
+  }
+  const payload = `data: ${JSON.stringify({ leaderboard: board })}\n\n`;
+  for (const res of rankingClients) {
+    res.write(payload);
+  }
+}
+
+// 점수 저장: POST /api/scores  { playerName, score, quizId? }
+app.post('/api/scores', async (req, res) => {
+  try {
+    const record = await scores.saveScore(req.body || {});
+    // 저장 성공 → 실시간 랭킹 갱신 브로드캐스트
+    broadcastLeaderboard();
+    res.status(201).json({ ok: true, record });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message });
+  }
+});
+
+// 랭킹 1회 조회: GET /api/leaderboard?limit=20
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const board = await scores.getLeaderboard(req.query.limit);
+    res.json({ ok: true, mode: scores.getMode(), leaderboard: board });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ ok: false, error: err.message });
+  }
+});
+
+// 실시간 랭킹 스트림: GET /api/leaderboard/stream (SSE)
+app.get('/api/leaderboard/stream', async (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive'
+  });
+  res.write('retry: 3000\n\n');
+  rankingClients.add(res);
+
+  // 접속 즉시 현재 랭킹 1회 전송
+  try {
+    const board = await scores.getLeaderboard();
+    res.write(`data: ${JSON.stringify({ leaderboard: board })}\n\n`);
+  } catch (err) {
+    console.error('[ranking] 초기 랭킹 전송 실패:', err.message);
+  }
+
+  // 연결 유지용 핑(프록시 타임아웃 방지)
+  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+
+  req.on('close', () => {
+    clearInterval(ping);
+    rankingClients.delete(res);
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`PassFinder MVP server running on http://localhost:${PORT}`);
+  console.log(`[scores] 저장 모드: ${scores.getMode()}`);
 });
