@@ -83,8 +83,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
   } catch {
     return Response.json(error(null, -32700, "요청 형식이 올바르지 않아요"), { status: 400 });
   }
-  const userId = await userFromToken(token);
+  // 본문 구조를 먼저 확인한다(객체 또는 객체 배열). 그다음 토큰을 조회한다.
   const messages = Array.isArray(body) ? body : [body];
+  if (!messages.length || messages.some((m) => typeof m !== "object" || m === null || Array.isArray(m))) {
+    return Response.json(error(null, -32600, "요청 형식이 올바르지 않아요"), { status: 400 });
+  }
+  let userId: string | null;
+  try {
+    userId = await userFromToken(token);
+  } catch (e) {
+    console.error("token lookup failed", e);
+    return Response.json(error(null, -32603, "잠시 문제가 생겼어요. 다시 시도해 주세요"), { status: 500 });
+  }
   const replies = [];
   for (const m of messages) {
     const r = await handleMessage(m, userId, req);
