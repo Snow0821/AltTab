@@ -42,14 +42,48 @@ test('one fixed GET selects only allowed columns with bounded pagination and ser
   for (const hidden of ['private@example.test', 'password', 'llm_claimed_at', ENV.SUPABASE_KEY]) assert.ok(!JSON.stringify(result).includes(hidden));
 });
 
-test('every unreviewed value is redacted, including credentials, PII, answers and markup', async () => {
-  for (const value of ['ordinary new text', 'private@example.test', '010-1234-5678', 'API_KEY=super-secret', '<img src=x onerror=alert(1)>', '내 정답은 3번', '홍길동']) {
+test('ordinary test text is returned exactly instead of being restricted to one hardcoded sample', async () => {
+  for (const value of ['ordinary new text', 'Basic example', '테스트 123 한글!', '<img src=x onerror=alert(1)>', '내 테스트 정답은 3번', '이 문장이 admin에도 보여야 해요']) {
     const service = makeService({ env: ENV, now: NOW, fetchImpl: async () => json([row(value)]) });
     const result = await service.rows();
-    assert.equal(result.rows[0].value, null);
-    assert.equal(result.rows[0].valueRedacted, true);
-    assert.ok(!JSON.stringify(result).includes(value));
+    assert.equal(result.rows[0].value, value);
+    assert.equal(result.rows[0].valueRedacted, false);
   }
+});
+
+test('only credential-like portions and exact configured server secrets are masked', async () => {
+  const samples = [
+    ['prefix API_KEY=super-secret suffix', 'super-secret'],
+    ['prefix password="secret with spaces" suffix', 'secret with spaces'],
+    ['prefix 비밀번호:abc123 suffix', 'abc123'],
+    ['prefix sb_secret_abcdefghijklmnop suffix', 'sb_secret_abcdefghijklmnop'],
+    ['prefix sk-proj-abcdefghijklmnop suffix', 'sk-proj-abcdefghijklmnop'],
+    ['prefix ghp_abcdefghijklmnop suffix', 'ghp_abcdefghijklmnop'],
+    ['prefix eyJabcdef.abcdefgh.abcdefgh suffix', 'eyJabcdef.abcdefgh.abcdefgh'],
+    ['prefix Bearer abcdefghijklmnop suffix', 'abcdefghijklmnop'],
+    ['prefix postgresql://user:secretpass@db.example/test suffix', 'secretpass'],
+    ['prefix ' + ENV.SUPABASE_KEY + ' suffix', ENV.SUPABASE_KEY],
+    ['prefix SUPABASE_KEY=' + ENV.SUPABASE_KEY + ' suffix', ENV.SUPABASE_KEY],
+    ['prefix DB_PASSWORD=super-secret-value suffix', 'super-secret-value'],
+    ['prefix AWS_SECRET_ACCESS_KEY=synthetic-secret-value suffix', 'synthetic-secret-value'],
+    ['prefix Authorization: Basic dXNlcjpwYXNzd29yZDEyMw== suffix', 'dXNlcjpwYXNzd29yZDEyMw=='],
+    ['prefix Authorization: Basic dTpw suffix', 'dTpw'],
+    ['prefix Authorization: Basic dTpwYQ== suffix', 'dTpwYQ=='],
+    ['prefix password="ab\\"cd-remaining-secret" suffix', 'cd-remaining-secret'],
+  ];
+  for (const [value, hidden] of samples) {
+    const service = makeService({ env: ENV, now: NOW, fetchImpl: async () => json([row(value)]) });
+    const result = await service.rows();
+    assert.equal(result.rows[0].valueRedacted, true);
+    assert.ok(!JSON.stringify(result).includes(hidden));
+    assert.match(result.rows[0].value, /^prefix /);
+    assert.match(result.rows[0].value, / suffix$/);
+    assert.match(result.rows[0].value, /\[비밀값 숨김\]/);
+    assert.equal(result.rows[0].value.match(/비밀값 숨김/g).length, 1);
+  }
+  const truncated = register.redactSecrets('password="unterminated secret value');
+  assert.equal(truncated.value, 'password=[비밀값 숨김]');
+  assert.equal(register.redactSecrets('password="trailing-secret\\').value, 'password=[비밀값 숨김]');
 });
 
 test('pagination is bounded and no raw query or table is forwarded', async (t) => {

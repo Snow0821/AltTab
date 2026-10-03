@@ -36,13 +36,14 @@ test('loads actual API once, displays KST/count/value and refresh ignores repeat
   finish(); await waitFor(() => !ctx.q('refresh').disabled); assert.equal(calls, 2);
 });
 
-test('renders markup as text and redacted rows never display hidden values', async (t) => {
+test('renders ordinary markup as text and displays server-masked portions without hiding the whole value', async (t) => {
   const ctx = setup(t, async () => response(payload([{ id: true, value: '<img src=x onerror=alert(1)>', valueRedacted: false, updated_at: '2026-10-03T06:00:00Z' }])));
   await waitFor(() => !ctx.q('refresh').disabled);
   assert.equal(ctx.q('rows').querySelector('img'), null); assert.match(ctx.q('rows').textContent, /<img/);
-  ctx.dom.window.fetch = async () => response(payload([{ id: true, value: 'SHOULD NEVER SHOW', valueRedacted: true, updated_at: '2026-10-03T06:00:00Z' }]));
+  ctx.dom.window.fetch = async () => response(payload([{ id: true, value: '테스트 문장 password=[비밀값 숨김] 끝', valueRedacted: true, updated_at: '2026-10-03T06:00:00Z' }]));
   ctx.click('refresh'); await waitFor(() => !ctx.q('refresh').disabled);
-  assert.match(ctx.q('rows').textContent, /가려진 텍스트/); assert.ok(!ctx.q('rows').textContent.includes('SHOULD NEVER SHOW'));
+  assert.match(ctx.q('rows').textContent, /테스트 문장 password=\[비밀값 숨김\] 끝/);
+  assert.match(ctx.q('status').textContent, /감지된 키·비밀번호만/);
 });
 
 test('empty data, provider error, network error and successful manual retry are distinct', async (t) => {

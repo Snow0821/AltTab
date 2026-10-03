@@ -12,7 +12,7 @@
   <header class="topbar"><a class="brand" href="/index.html">AltTab<span>DATABASE</span></a><a href="/mock/">연결 테스트 ↗</a></header>
   <main>
     <section class="intro"><div><p class="eyebrow">ADMIN / DATA EXPLORER</p><h1>저장된 데이터 보기</h1><p>Supabase에 저장된 공개 테스트 데이터를 확인하세요.</p></div><span class="pill">읽기 전용 · 로그인 없음</span></section>
-    <aside class="notice">누구나 볼 수 있는 화면이에요. 공개 검토된 샘플 문장만 표시하며, 그 외 자유 입력은 가려요. 개인정보·키·비밀번호는 표시하지 않아요.</aside>
+    <aside class="notice">연결 테스트에서 저장한 문장이 누구에게나 공개돼요. 개인정보·키·비밀번호를 입력하지 마세요. 감지된 비밀값만 가려요.</aside>
     <div class="workspace">
       <aside class="sidebar"><p class="eyebrow">공개 테이블</p><button id="table-select" class="table-choice" type="button" aria-pressed="true"><span>DB 연결 테스트</span><small>alttab_connection_test</small></button><p class="side-note">검토된 테이블만 표시해요.<br>새 테이블은 자동 공개되지 않아요.</p></aside>
       <section class="main-panel" aria-labelledby="table-title">
@@ -23,7 +23,7 @@
           <table><caption class="sr-only">DB 연결 테스트 저장 데이터</caption><thead><tr><th scope="col">id <small>boolean</small></th><th scope="col">value <small>text</small></th><th scope="col">updated_at <small>한국 시간 (UTC+9)</small></th></tr></thead><tbody id="rows"></tbody></table>
         </div>
         <div class="pagination"><span id="page-info">페이지 1 · 최대 25행</span><div><button id="previous" type="button" disabled>이전</button><button id="next" type="button" disabled>다음</button></div></div>
-        <details class="schema"><summary>표시하는 컬럼과 저장 위치</summary><dl><dt>id</dt><dd>고정 테스트 행의 ID. 현재 테이블은 1행만 저장해요.</dd><dt>value</dt><dd>연결 테스트에서 마지막으로 저장한 문장. 검토되지 않은 자유 입력은 원문 대신 ‘가려진 텍스트’로 표시해요.</dd><dt>updated_at</dt><dd>마지막 저장 시각. 화면에서는 한국 시간으로 표시해요.</dd></dl><p>학습 문제·풀이 기록은 현재 브라우저 저장소에 있어 이 DB 표에 나타나지 않아요. 기존 PDF 업로드는 서버 임시 저장소를 사용해요.</p></details>
+        <details class="schema"><summary>표시하는 컬럼과 저장 위치</summary><dl><dt>id</dt><dd>고정 테스트 행의 ID. 현재 테이블은 1행만 저장해요.</dd><dt>value</dt><dd>연결 테스트에서 마지막으로 저장한 문장을 그대로 표시해요. 감지된 키·비밀번호 부분만 ‘[비밀값 숨김]’으로 바꿔요.</dd><dt>updated_at</dt><dd>마지막 저장 시각. 화면에서는 한국 시간으로 표시해요.</dd></dl><p>학습 문제·풀이 기록은 현재 브라우저 저장소에 있어 이 DB 표에 나타나지 않아요. 기존 PDF 업로드는 서버 임시 저장소를 사용해요.</p></details>
       </section>
     </div>
     <footer>현재 공개 대상: 테스트 테이블 1개 · 수정·삭제·SQL 실행 기능 없음</footer>
