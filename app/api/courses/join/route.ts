@@ -2,11 +2,11 @@
 import { db } from "@/lib/supabase-admin";
 import { requireUser } from "@/lib/auth";
 import { handle, ok, readJson, HttpError } from "@/lib/http";
+import { str } from "@/lib/validate";
 
 export const POST = handle(async (req) => {
   const user = await requireUser(req);
-  const { code } = await readJson<{ code?: string }>(req);
-  const joinCode = (code ?? "").replace(/\s/g, "").toUpperCase();
+  const joinCode = str(await readJson(req), "code", { label: "참여 코드", max: 20 }).replace(/\s/g, "").toUpperCase();
   const { data: course, error } = await db().from("courses").select("id").eq("join_code", joinCode).maybeSingle();
   if (error) throw error;
   if (!course) throw new HttpError(404, "no_code", "참여 코드를 찾을 수 없어요");

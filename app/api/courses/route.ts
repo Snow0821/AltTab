@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import { db } from "@/lib/supabase-admin";
 import { requireUser } from "@/lib/auth";
 import { handle, ok, readJson, HttpError } from "@/lib/http";
+import { str } from "@/lib/validate";
 import { hasAccess } from "@/lib/entitlement";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 헷갈리는 0·O·1·I 제외
@@ -45,9 +46,7 @@ export const GET = handle(async (req) => {
 
 export const POST = handle(async (req) => {
   const user = await requireUser(req);
-  const { title } = await readJson<{ title?: string }>(req);
-  const name = (title ?? "").trim();
-  if (name.length < 1 || name.length > 60) throw new HttpError(400, "invalid", "과목 이름은 1~60자로 적어 주세요");
+  const name = str(await readJson(req), "title", { label: "과목 이름", min: 1, max: 60 });
   for (let i = 0; i < 5; i++) {
     const { data, error } = await db()
       .from("courses")
@@ -56,8 +55,7 @@ export const POST = handle(async (req) => {
       .single();
     if (error?.code === "23505") continue; // 참여 코드 충돌 시 다시 뽑기
     if (error) throw error;
-    const { error: e2 } = await db().from("course_members").insert({ course_id: data.id, user_id: user.id, role: "owner" });
-    if (e2) throw e2;
+    // owner 참여는 courses 트리거(courses_add_owner)가 같은 트랜잭션에서 만든다. 실패하면 과목도 남지 않는다.
     return ok({ course: { id: data.id, title: data.title, joinCode: data.join_code } }, 201);
   }
   throw new HttpError(500, "server_error", "참여 코드를 만들지 못했어요. 다시 시도해 주세요");

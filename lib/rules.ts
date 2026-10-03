@@ -7,15 +7,32 @@ export const UNIT_SIZE = 5; // 유닛 하나의 스테이지 수
 export const FREE_STAGES = 5; // 이용권 없이 풀 수 있는 스테이지 수(첫 유닛)
 export const XP = { correct: 10, clear: 20, perfect: 10 };
 
-// 채점·중복 판정용 정규화: 대소문자·띄어쓰기·문장부호를 무시하고 글자와 숫자만 남긴다.
-export function normalizeText(s: string): string {
-  return (s ?? "").normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+// 정규화는 띄어쓰기·대소문자·전각 문자와, 앞뒤를 감싼 따옴표, 끝에 붙은 문장부호(. , ! ? ; : 。 、)만 무시한다.
+// 부호·소수점·연산자(- . + * / ^ = < > % # ( ) 등)는 뜻이 달라지므로 그대로 둔다. 예: "-1"≠"1", "1.5"≠"15", "C++"≠"C".
+const QUOTES = /^["'`“”‘’]+|["'`“”‘’]+$/gu;
+const TRAILING_PUNCT = /[.,!?;:。、]+$/u;
+
+function normalizeCore(s: string): string {
+  let t = String(s ?? "").normalize("NFKC").toLowerCase().replace(/\s+/gu, "");
+  t = t.replace(QUOTES, "");
+  t = t.replace(TRAILING_PUNCT, "");
+  return t.replace(QUOTES, "");
+}
+
+// ★3 단답형 채점용
+export function normalizeAnswer(s: string): string {
+  return normalizeCore(s);
+}
+
+// 같은 개념 안 문항 본문 중복 판정용. 채점과 같은 규칙이지만 용도가 달라 이름을 나눈다.
+export function normalizeBody(s: string): string {
+  return normalizeCore(s);
 }
 
 // ★3 단답형: 허용 답안 중 하나와 정규화 결과가 같으면 정답. 빈 답은 오답.
 export function gradeShort(answer: string, accepted: string[]): boolean {
-  const a = normalizeText(answer);
-  return a.length > 0 && accepted.some((x) => normalizeText(x) === a);
+  const a = normalizeAnswer(answer);
+  return a.length > 0 && accepted.some((x) => normalizeAnswer(x) === a);
 }
 
 // ★1·★2 객관식: 고른 선택지 글자가 정답과 같으면 정답. 빈 답은 오답.

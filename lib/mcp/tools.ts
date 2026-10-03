@@ -5,7 +5,7 @@ import { requireMember } from "../access";
 import { HttpError } from "../http";
 import { embed, cosine, parseVector, EmbedError } from "../embed";
 import { parseRef } from "../chunk";
-import { normalizeText, orderStages, unitOf, type ConceptNode } from "../rules";
+import { normalizeBody, orderStages, unitOf, type ConceptNode } from "../rules";
 import { reviewableQuestionIds, statusOf } from "../review";
 
 export class ToolError extends Error {}
@@ -68,6 +68,10 @@ async function chunksForRefs(courseId: string, refs: string[], max: number, with
   return ((data ?? []) as unknown as { material_no: number; page: number; content: string; embedding?: unknown }[])
     .filter((c) => want.has(ref(c.material_no, c.page)))
     .slice(0, max);
+}
+
+function isObject(v: unknown): v is Args {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 function asStringArray(v: unknown): string[] | null {
@@ -187,7 +191,8 @@ const submitConcepts: Tool = {
     const rejected: { name: string; reason: string }[] = [];
     const toInsert: Record<string, unknown>[] = [];
     for (const c of list) {
-      const name = String(c.name ?? "").trim();
+      if (!isObject(c)) { rejected.push({ name: "(형식 오류)", reason: "개념 형식이 올바르지 않아요" }); continue; }
+      const name = typeof c.name === "string" ? c.name.trim() : "";
       const summary = String(c.summary ?? "").trim();
       const refs = asStringArray(c.evidence_refs) ?? [];
       if (!name) { rejected.push({ name: "(이름 없음)", reason: "누락: 이름" }); continue; }
@@ -350,6 +355,7 @@ const submitQuestions: Tool = {
 
     list.forEach((q, index) => {
       const reject = (reason: string) => rejected.push({ index, reason });
+      if (!isObject(q)) return reject("문항 형식이 올바르지 않아요");
       const missing = ["concept_id", "difficulty", "qtype", "body", "answer", "explanation"].filter((k) => q[k] === undefined || String(q[k]).trim() === "");
       const names: Record<string, string> = { concept_id: "개념", difficulty: "난이도", qtype: "유형", body: "본문", answer: "정답", explanation: "해설" };
       if (missing.length) return reject(`누락: ${missing.map((k) => names[k]).join(", ")}`);
@@ -376,7 +382,7 @@ const submitQuestions: Tool = {
       let accepted: string[] = [];
       if (qtype === "choice") {
         choices = asStringArray(q.choices) ?? [];
-        const norms = choices.map(normalizeText);
+        const norms = choices.map(normalizeBody);
         if (new Set(norms).size !== norms.length) return reject("선택지가 중복돼요");
         const correct = choices.filter((c) => c === answer).length;
         if (correct !== 1) return reject("객관식 정답이 선택지 중 정확히 1개와 같아야 해요");
@@ -399,7 +405,7 @@ const submitQuestions: Tool = {
           difficulty: suggestion,
           qtype,
           body,
-          body_norm: normalizeText(body),
+          body_norm: normalizeBody(body),
           choices,
           answer,
           accepted_answers: accepted,
@@ -412,11 +418,11 @@ const submitQuestions: Tool = {
 
     // 근거 위치가 교안에 있는지, 같은 개념에 본문이 같은 문항이 있는지
     const okRefs = await existingRefs(courseId, valid.flatMap((v) => v.refs));
+    // 본문에는 따옴표·괄호가 남을 수 있어 DB 필터에 넣지 않고, 해당 개념의 본문을 읽어 비교한다
     const { data: dupRows, error: e2 } = await db()
       .from("questions")
       .select("id, concept_id, body_norm")
-      .in("concept_id", [...new Set(valid.map((v) => v.row.concept_id as string))].concat(["00000000-0000-0000-0000-000000000000"]))
-      .in("body_norm", valid.map((v) => v.row.body_norm as string).concat(["-"]));
+      .in("concept_id", [...new Set(valid.map((v) => v.row.concept_id as string))].concat(["00000000-0000-0000-0000-000000000000"]));
     if (e2) throw e2;
     const seen = new Map((dupRows ?? []).map((d) => [`${d.concept_id}|${d.body_norm}`, d.id as string]));
     const checked: Valid[] = [];
@@ -555,13 +561,14 @@ const submitReviews: Tool = {
     const list = Array.isArray(args.reviews) ? (args.reviews as Args[]) : [];
     if (!list.length) throw new ToolError("reviews가 비어 있어요");
     if (list.length > 30) throw new ToolError("검수는 한 번에 30개까지 보낼 수 있어요");
-    const ids = list.map((r) => String(r.question_id ?? "")).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    const ids = list.filter(isObject).map((r) => String(r.question_id ?? "")).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
     const { data: qs, error } = await db().from("questions").select("id, course_id, author_id").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
     if (error) throw error;
     const byId = new Map((qs ?? []).map((q) => [q.id as string, q]));
     const saved: string[] = [];
     const rejected: { question_id: string; reason: string }[] = [];
     for (const r of list) {
+      if (!isObject(r)) { rejected.push({ question_id: "", reason: "검수 형식이 올바르지 않아요" }); continue; }
       const id = String(r.question_id ?? "");
       const q = byId.get(id);
       const verdict = String(r.verdict ?? "");

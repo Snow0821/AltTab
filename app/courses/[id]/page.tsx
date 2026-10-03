@@ -33,7 +33,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         {info.access.has && <span className="rounded-full bg-[var(--ok)] px-2 py-0.5 text-xs text-white">이용 중</span>}
       </div>
 
-      <StageMap courseId={id} />
+      <StageMap courseId={id} courseTitle={info.course.title} />
 
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2">

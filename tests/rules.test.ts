@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   gradeShort,
   gradeChoice,
-  normalizeText,
+  normalizeBody,
   orderStages,
   stageStates,
   scoreAttempt,
@@ -14,9 +14,24 @@ import {
   unitOf,
 } from "../lib/rules.ts";
 
-test("단답형: 띄어쓰기·대소문자·문장부호를 무시하고 허용 답안과 비교", () => {
+test("단답형: 부호·소수점·연산자는 보존해 다른 답을 정답 처리하지 않는다", () => {
+  assert.equal(gradeShort("-1", ["1"]), false);
+  assert.equal(gradeShort("1.5", ["15"]), false);
+  assert.equal(gradeShort("a+b", ["ab"]), false);
+  assert.equal(gradeShort("C++", ["C"]), false);
+  assert.equal(gradeShort("O(n log n)", ["O(n)"]), false);
+  assert.equal(gradeShort("x>=0", ["x>0"]), false);
+  assert.equal(gradeShort("-1", ["-1"]), true);
+  assert.equal(gradeShort("1.5", ["1.5"]), true);
+  assert.equal(gradeShort("C++", ["c++"]), true);
+});
+
+test("단답형: 띄어쓰기·대소문자·끝 문장부호·따옴표·전각은 무시한다", () => {
   assert.equal(gradeShort(" 후입 선출. ", ["후입선출", "LIFO"]), true);
   assert.equal(gradeShort("lifo", ["후입선출", "LIFO"]), true);
+  assert.equal(gradeShort("\"LIFO\"", ["LIFO"]), true);
+  assert.equal(gradeShort("ＬＩＦＯ", ["LIFO"]), true);
+  assert.equal(gradeShort("3 단계?", ["3단계"]), true);
   assert.equal(gradeShort("선입선출", ["후입선출", "LIFO"]), false); // 반대 개념은 오답
   assert.equal(gradeShort("FIFO", ["후입선출", "LIFO"]), false);
   assert.equal(gradeShort("", ["후입선출"]), false); // 빈 답은 오답
@@ -29,8 +44,10 @@ test("객관식: 빈 답은 오답", () => {
   assert.equal(gradeChoice("큐", "스택"), false);
 });
 
-test("중복 판정용 정규화", () => {
-  assert.equal(normalizeText("TCP는 몇 단계?"), normalizeText("tcp는 몇단계"));
+test("중복 판정용 정규화: 띄어쓰기·대소문자·끝 문장부호만 무시", () => {
+  assert.equal(normalizeBody("TCP는 몇 단계?"), normalizeBody("tcp는 몇단계"));
+  assert.notEqual(normalizeBody("1+1의 값은?"), normalizeBody("1-1의 값은?"));
+  assert.notEqual(normalizeBody("C++의 특징은?"), normalizeBody("C의 특징은?"));
 });
 
 const c = (id: string, name: string, pre: string[], imp: number | null, t: string) => ({

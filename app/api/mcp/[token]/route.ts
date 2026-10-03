@@ -26,6 +26,7 @@ const error = (id: Rpc["id"], code: number, message: string) => ({ jsonrpc: "2.0
 const result = (id: Rpc["id"], value: unknown) => ({ jsonrpc: "2.0", id, result: value });
 
 async function handleMessage(msg: Rpc, userId: string | null, req: Request) {
+  if (typeof msg !== "object" || msg === null || Array.isArray(msg)) return error(null, -32600, "요청 형식이 올바르지 않아요");
   if (msg.id === undefined || msg.id === null) return null; // 알림에는 답하지 않는다
   if (!userId) return error(msg.id, -32001, "연결 주소가 올바르지 않아요. PassFinder 과목 화면에서 MCP 주소를 다시 복사해 주세요");
   switch (msg.method) {
@@ -47,7 +48,9 @@ async function handleMessage(msg: Rpc, userId: string | null, req: Request) {
       const tool = TOOLS.find((t) => t.name === name);
       if (!tool) return error(msg.id, -32602, `없는 도구예요: ${name}`);
       try {
-        const out = await tool.run(userId, (msg.params?.arguments ?? {}) as Record<string, unknown>, req);
+        const raw = msg.params?.arguments;
+        const args = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+        const out = await tool.run(userId, args, req);
         return result(msg.id, { content: [{ type: "text", text: JSON.stringify(out) }] });
       } catch (e) {
         const text = e instanceof ToolError || e instanceof HttpError ? e.message : "잠시 문제가 생겼어요. 다시 시도해 주세요";

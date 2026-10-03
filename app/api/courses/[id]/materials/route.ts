@@ -4,7 +4,8 @@ import { db } from "@/lib/supabase-admin";
 import { requireUser } from "@/lib/auth";
 import { requireMember } from "@/lib/access";
 import { handle, ok, readJson, HttpError } from "@/lib/http";
-import { chunkPages, type PageText } from "@/lib/chunk";
+import { chunkPages } from "@/lib/chunk";
+import { str, int, arrayOf, asObject, InvalidInput } from "@/lib/validate";
 
 const MAX_FILES = 20;
 const MIN_BYTES = 1024;
@@ -38,16 +39,20 @@ export const POST = handle(async (req, ctx: Ctx) => {
   const { id } = await ctx.params;
   const user = await requireUser(req);
   await requireMember(user.id, id);
-  const body = await readJson<{ filename?: string; fileHash?: string; sizeBytes?: number; pages?: PageText[] }>(req);
-  const filename = String(body.filename ?? "").trim().slice(0, 200);
+  const body = await readJson(req);
+  const filename = str(body, "filename", { label: "파일 이름", max: 200 });
   if (!/\.pdf$/i.test(filename)) throw new HttpError(400, "not_pdf", "PDF 파일만 올릴 수 있어요");
-  const size = Number(body.sizeBytes);
-  if (!Number.isFinite(size) || size < MIN_BYTES) throw new HttpError(400, "too_small", "1KB보다 작은 파일은 올릴 수 없어요");
+  const size = int(body, "sizeBytes", { label: "파일 크기" })!;
+  if (size < MIN_BYTES) throw new HttpError(400, "too_small", "1KB보다 작은 파일은 올릴 수 없어요");
   if (size > MAX_BYTES) throw new HttpError(400, "too_large", "50MB보다 큰 파일은 올릴 수 없어요");
-  const hash = String(body.fileHash ?? "");
+  const hash = str(body, "fileHash", { label: "파일 정보", max: 64 });
   if (!/^[0-9a-f]{64}$/.test(hash)) throw new HttpError(400, "invalid", "파일 정보를 읽지 못했어요. 다시 올려 주세요");
-  const pages = Array.isArray(body.pages) ? body.pages : [];
-  const chunks = chunkPages(pages.map((p) => ({ page: Number(p.page), text: String(p.text ?? "") })));
+  const pages = arrayOf(body, "pages", "쪽 목록", 5000, (v) => {
+    const p = asObject(v);
+    if (typeof p.text !== "string") throw new InvalidInput("쪽 글자 형식이 올바르지 않아요");
+    return { page: int(p, "page", { label: "쪽 번호", min: 1, max: 100_000 })!, text: p.text };
+  });
+  const chunks = chunkPages(pages);
   if (chunks.length === 0) throw new HttpError(400, "no_text", "텍스트를 추출할 수 없습니다");
 
   const { data: existing, error: e1 } = await db()
@@ -68,7 +73,7 @@ export const POST = handle(async (req, ctx: Ctx) => {
       filename,
       file_hash: hash,
       size_bytes: size,
-      page_count: Math.max(1, ...pages.map((p) => Number(p.page) || 1)),
+      page_count: Math.max(1, ...pages.map((p) => p.page)),
       status: "uploaded",
       chunk_count: chunks.length,
     })

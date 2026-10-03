@@ -27,6 +27,27 @@ create table if not exists course_members (
   primary key (course_id, user_id)
 );
 
+-- 과목을 만들면 같은 트랜잭션에서 만든 사람을 owner로 참여시킨다.
+-- 참여 저장이 실패하면 과목 insert도 함께 취소되어, 아무도 들어갈 수 없는 과목이 남지 않는다.
+create or replace function add_course_owner() returns trigger
+language plpgsql as $$
+begin
+  insert into course_members (course_id, user_id, role) values (new.id, new.owner_id, 'owner');
+  return new;
+end;
+$$;
+drop trigger if exists courses_add_owner on courses;
+create trigger courses_add_owner after insert on courses
+  for each row execute function add_course_owner();
+
+-- 가입 시도 기록(쓰기: 인증·과목 모듈). 확인 메일 없이 가입하므로 접속 주소별 시도 횟수를 제한한다.
+create table if not exists signup_attempts (
+  id bigint generated always as identity primary key,
+  ip text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists signup_attempts_ip_time on signup_attempts (ip, created_at);
+
 -- ── 교안 (쓰기: 교안 모듈) ─────────────────────────────
 -- no: 과목 안의 교안 번호(1~20). 근거 위치는 "교안번호:쪽" 문자열(예: "1:15")로 가리킨다.
 create table if not exists materials (
@@ -272,6 +293,8 @@ alter table xp_log enable row level security;
 alter table payments enable row level security;
 alter table entitlements enable row level security;
 alter table mcp_tokens enable row level security;
+alter table signup_attempts enable row level security;
 revoke all on question_status from anon, authenticated;
+revoke execute on function add_course_owner() from public, anon, authenticated;
 revoke execute on function match_chunks(uuid, vector, int) from public, anon, authenticated;
 revoke execute on function concept_importance(uuid, vector, float) from public, anon, authenticated;
