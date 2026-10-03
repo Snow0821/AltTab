@@ -77,7 +77,6 @@ Production, Preview, Development별 설정 여부를 각각 기록해야 합니�
 | 2026-10-03 13:46 KST | SELECT 1 AS connection_ok | connection_ok = 1, 읽기 전용 연결 테스트 통과 |
 | 2026-10-03 13:46 KST | public 스키마 테이블 및 마이그레이션 목록 | 두 목록 모두 비어 있었습니다 |
 | 2026-10-03 13:49 KST | GitHub main 및 PR #4 최신 커밋의 코드 재확인 | main은 Express MVP, PR #4는 Draft. Supabase 변수 이름과 임베딩 변수 불일치가 그대로 확인됐습니다 |
-
 | 2026-10-03 13:55 KST | 문서 브랜치의 Vercel 자동 Preview | 공식 봇 댓글에서 Ready 확인. DB·LLM 런타임 테스트는 미실행 |
 
 ## 참고 자료
